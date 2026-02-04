@@ -125,7 +125,9 @@ def _build_file_blocks(context: dict[str, str]) -> str:
     )
 
 
-def build_provisioning_message(agent: Agent, board: Board, auth_token: str) -> str:
+def build_provisioning_message(
+    agent: Agent, board: Board, auth_token: str, confirm_token: str
+) -> str:
     context = _build_context(agent, board, auth_token)
     file_blocks = _build_file_blocks(context)
     heartbeat_snippet = json.dumps(
@@ -162,12 +164,17 @@ def build_provisioning_message(agent: Agent, board: Board, auth_token: str) -> s
         f"{heartbeat_snippet}\n"
         "```\n"
         "Note: if any agents.list entry defines heartbeat, only those agents "
-        "run heartbeats.\n\n"
+        "run heartbeats.\n"
+        "7) After provisioning completes, confirm by calling:\n"
+        f"   POST {context['base_url']}/api/v1/agents/{context['agent_id']}/provision/confirm\n"
+        f"   Body: {{\"token\": \"{confirm_token}\", \"action\": \"provision\"}}\n\n"
         "Files:" + file_blocks
     )
 
 
-def build_update_message(agent: Agent, board: Board, auth_token: str) -> str:
+def build_update_message(
+    agent: Agent, board: Board, auth_token: str, confirm_token: str
+) -> str:
     context = _build_context(agent, board, auth_token)
     file_blocks = _build_file_blocks(context)
     heartbeat_snippet = json.dumps(
@@ -202,7 +209,10 @@ def build_update_message(agent: Agent, board: Board, auth_token: str) -> str:
         f"{heartbeat_snippet}\n"
         "```\n"
         "Note: if any agents.list entry defines heartbeat, only those agents "
-        "run heartbeats.\n\n"
+        "run heartbeats.\n"
+        "7) After the update completes, confirm by calling:\n"
+        f"   POST {context['base_url']}/api/v1/agents/{context['agent_id']}/provision/confirm\n"
+        f"   Body: {{\"token\": \"{confirm_token}\", \"action\": \"update\"}}\n\n"
         "Files:" + file_blocks
     )
 
@@ -211,6 +221,7 @@ async def send_provisioning_message(
     agent: Agent,
     board: Board,
     auth_token: str,
+    confirm_token: str,
 ) -> None:
     if not board.gateway_url:
         return
@@ -219,7 +230,7 @@ async def send_provisioning_message(
     main_session = board.gateway_main_session_key
     config = GatewayConfig(url=board.gateway_url, token=board.gateway_token)
     await ensure_session(main_session, config=config, label="Main Agent")
-    message = build_provisioning_message(agent, board, auth_token)
+    message = build_provisioning_message(agent, board, auth_token, confirm_token)
     await send_message(message, session_key=main_session, config=config, deliver=False)
 
 
@@ -227,6 +238,7 @@ async def send_update_message(
     agent: Agent,
     board: Board,
     auth_token: str,
+    confirm_token: str,
 ) -> None:
     if not board.gateway_url:
         return
@@ -235,5 +247,5 @@ async def send_update_message(
     main_session = board.gateway_main_session_key
     config = GatewayConfig(url=board.gateway_url, token=board.gateway_token)
     await ensure_session(main_session, config=config, label="Main Agent")
-    message = build_update_message(agent, board, auth_token)
+    message = build_update_message(agent, board, auth_token, confirm_token)
     await send_message(message, session_key=main_session, config=config, deliver=False)

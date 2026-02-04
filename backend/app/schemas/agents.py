@@ -44,3 +44,8 @@ class AgentHeartbeatCreate(AgentHeartbeat):
 
 class AgentDeleteConfirm(SQLModel):
     token: str
+
+
+class AgentProvisionConfirm(SQLModel):
+    token: str
+    action: str | None = None

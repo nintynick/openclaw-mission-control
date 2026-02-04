@@ -20,6 +20,9 @@ class Agent(SQLModel, table=True):
     heartbeat_config: dict[str, Any] | None = Field(
         default=None, sa_column=Column(JSON)
     )
+    provision_requested_at: datetime | None = Field(default=None)
+    provision_confirm_token_hash: str | None = Field(default=None, index=True)
+    provision_action: str | None = Field(default=None, index=True)
     delete_requested_at: datetime | None = Field(default=None)
     delete_confirm_token_hash: str | None = Field(default=None, index=True)
     last_seen_at: datetime | None = Field(default=None)
