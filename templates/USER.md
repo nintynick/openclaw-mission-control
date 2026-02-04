@@ -4,7 +4,6 @@
 
 - **Name:** {{ user_name }}
 - **What to call them:** {{ user_preferred_name }}
-- **Pronouns:** {{ user_pronouns }}
 - **Timezone:** {{ user_timezone }}
 - **Notes:** {{ user_notes }}
 
