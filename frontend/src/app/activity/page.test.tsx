@@ -7,8 +7,13 @@ import { AuthProvider } from "@/components/providers/AuthProvider";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 
 vi.mock("next/link", () => {
+  type LinkProps = React.PropsWithChildren<{
+    href: string | { pathname?: string };
+  }> &
+    Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href">;
+
   return {
-    default: ({ href, children, ...props }: any) => (
+    default: ({ href, children, ...props }: LinkProps) => (
       <a href={typeof href === "string" ? href : "#"} {...props}>
         {children}
       </a>
