@@ -878,8 +878,9 @@ async def update_task(
             elif updates["status"] == "in_progress":
                 task.in_progress_at = utcnow()
 
-        if "assigned_agent_id" in updates and updates["assigned_agent_id"]:
-            agent = await Agent.objects.by_id(updates["assigned_agent_id"]).first(session)
+        assigned_agent_id = updates.get("assigned_agent_id")
+        if assigned_agent_id:
+            agent = await Agent.objects.by_id(assigned_agent_id).first(session)
             if agent is None:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
             if agent.board_id and task.board_id and agent.board_id != task.board_id:
