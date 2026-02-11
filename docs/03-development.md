@@ -5,9 +5,8 @@
 - [Testing guide](testing/README.md)
 - [Troubleshooting deep dive](troubleshooting/README.md)
 
-This page describes the **canonical contributor workflow** for Mission Control, including local dev loops and CI parity.
+How we develop Mission Control locally, with a workflow that stays close to CI.
 
-> Evidence basis: consolidated from repo root `README.md`, `.github/workflows/ci.yml`, `Makefile`, `scripts/with_node.sh`, and `docs/testing/README.md`.
 
 ## Prerequisites
 

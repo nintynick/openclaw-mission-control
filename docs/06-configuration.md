@@ -13,8 +13,6 @@ Mission Control is a 3-service stack (`compose.yml`): Postgres (`db`), FastAPI b
 
 ### Docker Compose (recommended local/self-host)
 
-Evidence: `compose.yml`, `.env.example`, `backend/.env.example`.
-
 Precedence (highest → lowest):
 
 1) **Explicit runtime environment** passed to Compose
@@ -37,8 +35,6 @@ Precedence (highest → lowest):
 
 ### Backend env-file loading behavior (non-Compose)
 
-Evidence: `backend/app/core/config.py`.
-
 When running the backend directly (e.g., `uvicorn`), settings load from env vars and from these files:
 - `backend/.env` (always attempted)
 - `.env` (repo root; optional)
@@ -47,12 +43,10 @@ This is intentional so running from repo root still picks up backend config.
 
 ### Frontend env-file behavior (non-Compose)
 
-Evidence: `frontend/.env.example`, `compose.yml`.
-
 - Next.js uses `NEXT_PUBLIC_*` variables for browser-visible configuration.
 - For local dev you typically create `frontend/.env.local` (Next.js convention) or `frontend/.env` (if you want Compose to read it).
 
-## Env var reference (first pass)
+## Environment variables
 
 This table is based on `backend/app/core/config.py`, `.env.example`, `backend/.env.example`, `frontend/.env.example`, and `compose.yml`.
 
