@@ -68,12 +68,12 @@ Clerk:
 
 Template: `frontend/.env.example`.
 
-- `NEXT_PUBLIC_API_URL` (required)
-
-Clerk:
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-- `CLERK_SECRET_KEY`
-- redirect URLs (`NEXT_PUBLIC_CLERK_*`)
+| Variable | Required? | Purpose | Default / example | Footguns |
+|---|---:|---|---|---|
+| `NEXT_PUBLIC_API_URL` | **yes** | Backend base URL used by the browser | `http://localhost:8000` | Must be browser-reachable |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | **yes** | Enables Clerk in the frontend | (none) | Must be a real publishable key |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | optional | Fallback redirect | `/boards` | — |
+| `NEXT_PUBLIC_CLERK_AFTER_SIGN_OUT_URL` | optional | Post-logout redirect | `/` | — |
 
 ## Minimal dev configuration
 
@@ -102,6 +102,11 @@ Evidence: `backend/app/main.py`, `backend/app/core/config.py`.
 
 - `CORS_ORIGINS` is a comma-separated list.
 - It must include the frontend origin (e.g. `http://localhost:3000`) or browser requests will fail.
+
+## Common footguns
+
+- **Frontend env template vs runtime env**: `frontend/.env.example` is a template and `compose.yml` intentionally does **not** load it at runtime. Use user-managed `frontend/.env` (for Compose) or `frontend/.env.local` (for Next dev).
+- **`NEXT_PUBLIC_API_URL` reachability**: must work from the browser’s network context (host), not only from within the Docker network.
 
 ## Troubleshooting config issues
 
