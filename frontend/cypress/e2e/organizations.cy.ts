@@ -14,7 +14,8 @@ describe("Organizations (PR #61)", () => {
     cy.clerkSignIn({ strategy: "email_code", identifier: email });
 
     cy.visit("/organization");
-    cy.contains(/members\s*&\s*invites/i, { timeout: 30_000 }).should("be.visible");
+    cy.waitForAppLoaded();
+    cy.contains(/members\s*&\s*invites/i).should("be.visible");
 
     // Deterministic assertion across roles:
     // - if user is admin: invite button enabled

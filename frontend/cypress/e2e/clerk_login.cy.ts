@@ -10,6 +10,7 @@ describe("Clerk login", () => {
 
     // After login, user should be able to access protected route.
     cy.visit("/activity");
-    cy.contains(/live feed/i, { timeout: 30_000 }).should("be.visible");
+    cy.waitForAppLoaded();
+    cy.contains(/live feed/i).should("be.visible");
   });
 });

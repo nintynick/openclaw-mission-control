@@ -31,7 +31,8 @@ describe("/activity feed", () => {
   }
 
   function assertSignedInAndLanded() {
-    cy.contains(/live feed/i, { timeout: 30_000 }).should("be.visible");
+    cy.waitForAppLoaded();
+    cy.contains(/live feed/i).should("be.visible");
   }
 
   it("auth negative: signed-out user cannot access /activity", () => {
@@ -70,7 +71,6 @@ describe("/activity feed", () => {
     cy.visit("/activity");
     assertSignedInAndLanded();
 
-    cy.wait("@activityList");
     cy.contains("CI hardening").should("be.visible");
     cy.contains("Hello world").should("be.visible");
   });
@@ -91,7 +91,6 @@ describe("/activity feed", () => {
     cy.visit("/activity");
     assertSignedInAndLanded();
 
-    cy.wait("@activityList");
     cy.contains(/waiting for new comments/i).should("be.visible");
   });
 
@@ -111,7 +110,6 @@ describe("/activity feed", () => {
     cy.visit("/activity");
     assertSignedInAndLanded();
 
-    cy.wait("@activityList");
     cy.contains(/unable to load feed|boom/i).should("be.visible");
   });
 });
