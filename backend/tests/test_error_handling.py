@@ -228,3 +228,19 @@ async def test_http_exception_wrapper_rejects_wrong_exception() -> None:
     req = Request({"type": "http", "headers": [], "state": {}})
     with pytest.raises(TypeError, match="Expected StarletteHTTPException"):
         await _http_exception_exception_handler(req, Exception("x"))
+
+
+def test_json_safe_covers_bytes_bytearray_and_fallback_str() -> None:
+    # bytes
+    assert error_handling._json_safe(b"\xff") == "\ufffd"
+
+    # bytearray/memoryview
+    assert error_handling._json_safe(bytearray(b"\xff")) == "\ufffd"
+    assert error_handling._json_safe(memoryview(b"\xff")) == "\ufffd"
+
+    # fallback to str(value)
+    class Weird:
+        def __str__(self) -> str:
+            return "weird"
+
+    assert error_handling._json_safe(Weird()) == "weird"
