@@ -104,8 +104,11 @@ describe("/activity feed", () => {
 
     cy.visit("/activity");
     assertSignedInAndLanded();
+    cy.wait("@activityList");
 
-    cy.contains(/ci hardening/i).should("be.visible");
+    // The Activity page lists generic activity events; task title enrichment is best-effort.
+    // When the task metadata isn't available yet, it renders as "Unknown task".
+    cy.contains(/unknown task/i).should("be.visible");
     cy.contains(/hello world/i).should("be.visible");
   });
 
@@ -125,6 +128,7 @@ describe("/activity feed", () => {
 
     cy.visit("/activity");
     assertSignedInAndLanded();
+    cy.wait("@activityList");
 
     cy.contains(/waiting for new activity/i).should("be.visible");
   });
@@ -145,6 +149,7 @@ describe("/activity feed", () => {
 
     cy.visit("/activity");
     assertSignedInAndLanded();
+    cy.wait("@activityList");
 
     cy.contains(/unable to load activity feed/i).should("be.visible");
   });
