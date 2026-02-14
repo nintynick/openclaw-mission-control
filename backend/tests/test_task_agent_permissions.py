@@ -340,6 +340,7 @@ async def test_non_lead_agent_moves_task_to_review_and_task_unassigns() -> None:
             gateway_id = uuid4()
             worker_id = uuid4()
             task_id = uuid4()
+            in_progress_at = utcnow()
 
             session.add(Organization(id=org_id, name="org"))
             session.add(
@@ -377,7 +378,7 @@ async def test_non_lead_agent_moves_task_to_review_and_task_unassigns() -> None:
                     description="",
                     status="in_progress",
                     assigned_agent_id=worker_id,
-                    in_progress_at=utcnow(),
+                    in_progress_at=in_progress_at,
                 ),
             )
             await session.commit()
@@ -397,6 +398,12 @@ async def test_non_lead_agent_moves_task_to_review_and_task_unassigns() -> None:
             assert updated.status == "review"
             assert updated.assigned_agent_id is None
             assert updated.in_progress_at is None
+
+            refreshed_task = (
+                (await session.exec(select(Task).where(col(Task.id) == task_id))).first()
+            )
+            assert refreshed_task is not None
+            assert refreshed_task.previous_in_progress_at == in_progress_at
     finally:
         await engine.dispose()
 
