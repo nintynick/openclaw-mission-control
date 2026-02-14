@@ -89,7 +89,8 @@ describe("Global approvals", () => {
 
     // Pending approval should be visible in the list.
     cy.contains(/unapproved tasks/i).should("be.visible");
-    cy.contains(/task closeout/i).should("be.visible");
+    // Action type is humanized as "Task · Closeout" in the UI.
+    cy.contains(/task\s*(?:·|\u00b7|\u2022)?\s*closeout/i).should("be.visible");
 
     cy.contains("button", /^approve$/i).click();
     cy.wait("@approvalUpdate", { timeout: 20_000 });
