@@ -33,18 +33,44 @@ function riskBadgeVariant(risk: string | null | undefined) {
   const normalizedRisk = (risk || "unknown").trim().toLowerCase();
 
   switch (normalizedRisk) {
+    case "safe":
     case "low":
       return "success";
+    case "minimal":
     case "medium":
     case "moderate":
-      return "warning";
+      return "outline";
     case "high":
     case "critical":
       return "danger";
+    case "elevated":
+      return "warning";
     case "unknown":
       return "outline";
     default:
       return "accent";
+  }
+}
+
+function riskPillClassName(risk: string | null | undefined) {
+  const normalizedRisk = (risk || "unknown").trim().toLowerCase();
+
+  switch (normalizedRisk) {
+    case "safe":
+    case "low":
+      return "bg-[color:rgba(16,185,129,0.16)] text-emerald-800 border border-emerald-200/70";
+    case "medium":
+    case "moderate":
+      return "bg-[color:rgba(245,158,11,0.16)] text-amber-800 border border-amber-200/70";
+    case "elevated":
+      return "bg-[color:rgba(245,158,11,0.16)] text-amber-800 border border-amber-200/70";
+    case "high":
+    case "critical":
+      return "bg-[color:rgba(244,63,94,0.16)] text-rose-800 border border-rose-200/70";
+    case "unknown":
+      return "bg-[color:rgba(148,163,184,0.16)] text-slate-700 border border-slate-200/80";
+    default:
+      return "bg-[color:rgba(99,102,241,0.16)] text-indigo-800 border border-indigo-200/70";
   }
 }
 
@@ -148,7 +174,7 @@ export function MarketplaceSkillsTable({
         cell: ({ row }) => (
           <Badge
             variant={riskBadgeVariant(row.original.risk)}
-            className="px-2 py-0.5"
+            className={`px-2 py-0.5 ${riskPillClassName(row.original.risk)} font-semibold`}
           >
             {riskBadgeLabel(row.original.risk)}
           </Badge>

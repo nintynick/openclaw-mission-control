@@ -14,6 +14,7 @@ from urllib.parse import unquote, urlparse
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, or_
 from sqlmodel import col
 
 from app.api.deps import require_org_admin
@@ -940,13 +941,69 @@ def _apply_pack_candidate_updates(
 @router.get("/marketplace", response_model=list[MarketplaceSkillCardRead])
 async def list_marketplace_skills(
     gateway_id: UUID = GATEWAY_ID_QUERY,
+    search: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    risk: str | None = Query(default=None),
+    pack_id: UUID | None = Query(default=None, alias="pack_id"),
     session: AsyncSession = SESSION_DEP,
     ctx: OrganizationContext = ORG_ADMIN_DEP,
 ) -> list[MarketplaceSkillCardRead]:
     """List marketplace cards for an org and annotate install state for a gateway."""
     gateway = await _require_gateway_for_org(gateway_id=gateway_id, session=session, ctx=ctx)
+    skills_query = MarketplaceSkill.objects.filter_by(organization_id=ctx.organization.id)
+
+    normalized_category = (category or "").strip().lower()
+    if normalized_category:
+        if normalized_category == "uncategorized":
+            skills_query = skills_query.filter(
+                or_(
+                    col(MarketplaceSkill.category).is_(None),
+                    func.trim(col(MarketplaceSkill.category)) == "",
+                ),
+            )
+        else:
+            skills_query = skills_query.filter(
+                func.lower(func.trim(col(MarketplaceSkill.category)))
+                == normalized_category,
+            )
+
+    normalized_risk = (risk or "").strip().lower()
+    if normalized_risk:
+        if normalized_risk == "uncategorized":
+            skills_query = skills_query.filter(
+                or_(
+                    col(MarketplaceSkill.risk).is_(None),
+                    func.trim(col(MarketplaceSkill.risk)) == "",
+                ),
+            )
+        else:
+            skills_query = skills_query.filter(
+                func.lower(func.trim(func.coalesce(col(MarketplaceSkill.risk), "")))
+                == normalized_risk,
+            )
+
+    if pack_id is not None:
+        pack = await _require_skill_pack_for_org(pack_id=pack_id, session=session, ctx=ctx)
+        normalized_pack_source = _normalize_pack_source_url(pack.source_url)
+        skills_query = skills_query.filter(
+            col(MarketplaceSkill.source_url).ilike(f"{normalized_pack_source}%"),
+        )
+
+    normalized_search = (search or "").strip()
+    if normalized_search:
+        search_like = f"%{normalized_search}%"
+        skills_query = skills_query.filter(
+            or_(
+                col(MarketplaceSkill.name).ilike(search_like),
+                col(MarketplaceSkill.description).ilike(search_like),
+                col(MarketplaceSkill.category).ilike(search_like),
+                col(MarketplaceSkill.risk).ilike(search_like),
+                col(MarketplaceSkill.source).ilike(search_like),
+            ),
+        )
+
     skills = (
-        await MarketplaceSkill.objects.filter_by(organization_id=ctx.organization.id)
+        await skills_query
         .order_by(col(MarketplaceSkill.created_at).desc())
         .all(session)
     )

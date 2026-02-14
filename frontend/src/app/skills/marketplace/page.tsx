@@ -31,11 +31,15 @@ import { MarketplaceSkillsTable } from "@/components/skills/MarketplaceSkillsTab
 import { DashboardPageLayout } from "@/components/templates/DashboardPageLayout";
 import { buttonVariants } from "@/components/ui/button";
 import { useOrganizationMembership } from "@/lib/use-organization-membership";
-import {
-  normalizeRepoSourceUrl,
-  repoBaseFromSkillSourceUrl,
-} from "@/lib/skills-source";
 import { useUrlSorting } from "@/lib/use-url-sorting";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const MARKETPLACE_SKILLS_SORTABLE_COLUMNS = [
   "name",
@@ -44,6 +48,75 @@ const MARKETPLACE_SKILLS_SORTABLE_COLUMNS = [
   "source",
   "updated_at",
 ];
+
+type MarketplaceSkillListParams =
+  listMarketplaceSkillsApiV1SkillsMarketplaceGetParams & {
+    search?: string;
+    category?: string;
+    risk?: string;
+    pack_id?: string;
+  };
+
+const RISK_SORT_ORDER: Record<string, number> = {
+  safe: 10,
+  low: 20,
+  minimal: 30,
+  medium: 40,
+  moderate: 50,
+  elevated: 60,
+  high: 70,
+  critical: 80,
+  none: 90,
+  unknown: 100,
+};
+
+function formatRiskLabel(risk: string) {
+  const normalized = risk.trim().toLowerCase();
+  if (!normalized) {
+    return "Unknown";
+  }
+
+  switch (normalized) {
+    case "safe":
+      return "Safe";
+    case "low":
+      return "Low";
+    case "minimal":
+      return "Minimal";
+    case "medium":
+      return "Medium";
+    case "moderate":
+      return "Moderate";
+    case "elevated":
+      return "Elevated";
+    case "high":
+      return "High";
+    case "critical":
+      return "Critical";
+    case "none":
+      return "None";
+    case "unknown":
+      return "Unknown";
+    default:
+      return normalized
+        .split(/[\s_-]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+  }
+}
+
+function formatCategoryLabel(category: string) {
+  const normalized = category.trim();
+  if (!normalized) {
+    return "Uncategorized";
+  }
+  return normalized
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 export default function SkillsMarketplacePage() {
   const queryClient = useQueryClient();
@@ -64,6 +137,9 @@ export default function SkillsMarketplacePage() {
   const [installingGatewayId, setInstallingGatewayId] = useState<string | null>(
     null,
   );
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedRisk, setSelectedRisk] = useState<string>("safe");
 
   const { sorting, onSortingChange } = useUrlSorting({
     allowedColumnIds: MARKETPLACE_SKILLS_SORTABLE_COLUMNS,
@@ -91,12 +167,52 @@ export default function SkillsMarketplacePage() {
   );
 
   const resolvedGatewayId = gateways[0]?.id ?? "";
+  const normalizedCategory = useMemo(() => {
+    const value = selectedCategory.trim().toLowerCase();
+    return value.length > 0 ? value : "all";
+  }, [selectedCategory]);
+  const normalizedRisk = useMemo(() => {
+    const value = selectedRisk.trim().toLowerCase();
+    return value.length > 0 ? value : "safe";
+  }, [selectedRisk]);
+  const normalizedSearch = useMemo(() => searchTerm.trim(), [searchTerm]);
+  const selectedPackId = searchParams.get("packId");
+  const skillsParams = useMemo<MarketplaceSkillListParams>(() => {
+    const params: MarketplaceSkillListParams = {
+      gateway_id: resolvedGatewayId,
+    };
+    if (normalizedSearch) {
+      params.search = normalizedSearch;
+    }
+    if (normalizedCategory !== "all") {
+      params.category = normalizedCategory;
+    }
+    if (normalizedRisk && normalizedRisk !== "all") {
+      params.risk = normalizedRisk;
+    }
+    if (selectedPackId) {
+      params.pack_id = selectedPackId;
+    }
+    return params;
+  }, [normalizedCategory, normalizedRisk, normalizedSearch, resolvedGatewayId, selectedPackId]);
+  const filterOptionsParams = useMemo<MarketplaceSkillListParams>(() => {
+    const params: MarketplaceSkillListParams = {
+      gateway_id: resolvedGatewayId,
+    };
+    if (normalizedSearch) {
+      params.search = normalizedSearch;
+    }
+    if (selectedPackId) {
+      params.pack_id = selectedPackId;
+    }
+    return params;
+  }, [normalizedSearch, resolvedGatewayId, selectedPackId]);
 
   const skillsQuery = useListMarketplaceSkillsApiV1SkillsMarketplaceGet<
     listMarketplaceSkillsApiV1SkillsMarketplaceGetResponse,
     ApiError
   >(
-    { gateway_id: resolvedGatewayId },
+    skillsParams,
     {
       query: {
         enabled: Boolean(isSignedIn && isAdmin && resolvedGatewayId),
@@ -109,6 +225,26 @@ export default function SkillsMarketplacePage() {
   const skills = useMemo<MarketplaceSkillCardRead[]>(
     () => (skillsQuery.data?.status === 200 ? skillsQuery.data.data : []),
     [skillsQuery.data],
+  );
+  const filterOptionSkillsQuery = useListMarketplaceSkillsApiV1SkillsMarketplaceGet<
+    listMarketplaceSkillsApiV1SkillsMarketplaceGetResponse,
+    ApiError
+  >(
+    filterOptionsParams,
+    {
+      query: {
+        enabled: Boolean(isSignedIn && isAdmin && resolvedGatewayId),
+        refetchOnMount: "always",
+        refetchInterval: 15_000,
+      },
+    },
+  );
+  const filterOptionSkills = useMemo<MarketplaceSkillCardRead[]>(
+    () =>
+      filterOptionSkillsQuery.data?.status === 200
+        ? filterOptionSkillsQuery.data.data
+        : [],
+    [filterOptionSkillsQuery.data],
   );
 
   const packsQuery = useListSkillPacksApiV1SkillsPacksGet<
@@ -125,21 +261,74 @@ export default function SkillsMarketplacePage() {
     () => (packsQuery.data?.status === 200 ? packsQuery.data.data : []),
     [packsQuery.data],
   );
-
-  const selectedPackId = searchParams.get("packId");
   const selectedPack = useMemo(
     () => packs.find((pack) => pack.id === selectedPackId) ?? null,
     [packs, selectedPackId],
   );
 
-  const visibleSkills = useMemo(() => {
-    if (!selectedPack) return skills;
-    const selectedRepo = normalizeRepoSourceUrl(selectedPack.source_url);
-    return skills.filter((skill) => {
-      const skillRepo = repoBaseFromSkillSourceUrl(skill.source_url);
-      return skillRepo === selectedRepo;
+  const filteredSkills = useMemo(() => skills, [skills]);
+
+  const categoryFilterOptions = useMemo(() => {
+    const byValue = new Map<string, string>();
+    for (const skill of filterOptionSkills) {
+      const raw = (skill.category || "Uncategorized").trim();
+      const label = raw.length > 0 ? raw : "Uncategorized";
+      const value = label.trim().toLowerCase();
+      if (!value || value === "all" || byValue.has(value)) {
+        continue;
+      }
+      byValue.set(value, label);
+    }
+    if (normalizedCategory !== "all" && !byValue.has(normalizedCategory)) {
+      byValue.set(normalizedCategory, formatCategoryLabel(normalizedCategory));
+    }
+    return Array.from(byValue.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [filterOptionSkills, normalizedCategory]);
+
+  const riskFilterOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const skill of filterOptionSkills) {
+      const risk = (skill.risk || "unknown").trim().toLowerCase();
+      const normalized = risk.length > 0 ? risk : "unknown";
+      if (normalized !== "all") {
+        set.add(normalized);
+      }
+    }
+    if (normalizedRisk !== "all") {
+      set.add(normalizedRisk);
+    }
+    const risks = Array.from(set);
+    return risks.sort((a, b) => {
+      const rankA = RISK_SORT_ORDER[a] ?? 1000;
+      const rankB = RISK_SORT_ORDER[b] ?? 1000;
+      if (rankA !== rankB) {
+        return rankA - rankB;
+      }
+      return a.localeCompare(b);
     });
-  }, [selectedPack, skills]);
+  }, [filterOptionSkills, normalizedRisk]);
+
+  useEffect(() => {
+    if (
+      selectedCategory !== "all" &&
+      !categoryFilterOptions.some(
+        (category) => category.value === selectedCategory.trim().toLowerCase(),
+      )
+    ) {
+      setSelectedCategory("all");
+    }
+  }, [categoryFilterOptions, selectedCategory]);
+
+  useEffect(() => {
+    if (
+      selectedRisk !== "all" &&
+      !riskFilterOptions.includes(selectedRisk.trim().toLowerCase())
+    ) {
+      setSelectedRisk("safe");
+    }
+  }, [riskFilterOptions, selectedRisk]);
 
   const loadSkillsByGateway = useCallback(async () => {
     // NOTE: This is technically N+1 (one request per gateway). We intentionally
@@ -411,11 +600,11 @@ export default function SkillsMarketplacePage() {
         title="Skills Marketplace"
         description={
           selectedPack
-            ? `${visibleSkills.length} skill${
-                visibleSkills.length === 1 ? "" : "s"
+            ? `${filteredSkills.length} skill${
+                filteredSkills.length === 1 ? "" : "s"
               } for ${selectedPack.name}.`
-            : `${visibleSkills.length} skill${
-                visibleSkills.length === 1 ? "" : "s"
+            : `${filteredSkills.length} skill${
+                filteredSkills.length === 1 ? "" : "s"
               } synced from packs.`
         }
         isAdmin={isAdmin}
@@ -440,9 +629,79 @@ export default function SkillsMarketplacePage() {
             </div>
           ) : (
             <>
+              <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="grid gap-4 md:grid-cols-[1fr_240px_240px]">
+                  <div>
+                    <label
+                      htmlFor="marketplace-search"
+                      className="mb-1 block text-sm font-medium text-slate-700"
+                    >
+                      Search
+                    </label>
+                    <Input
+                      id="marketplace-search"
+                      value={searchTerm}
+                      onChange={(event) => setSearchTerm(event.target.value)}
+                      placeholder="Search by name, description, category, pack, source..."
+                      type="search"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="marketplace-category-filter"
+                      className="mb-1 block text-sm font-medium text-slate-700"
+                    >
+                      Category
+                    </label>
+                    <Select
+                      value={selectedCategory}
+                      onValueChange={setSelectedCategory}
+                    >
+                      <SelectTrigger
+                        id="marketplace-category-filter"
+                        className="h-11"
+                      >
+                        <SelectValue placeholder="All categories" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All categories</SelectItem>
+                        {categoryFilterOptions.map((category) => (
+                          <SelectItem key={category.value} value={category.value}>
+                            {category.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="marketplace-risk-filter"
+                      className="mb-1 block text-sm font-medium text-slate-700"
+                    >
+                      Risk
+                    </label>
+                    <Select value={selectedRisk} onValueChange={setSelectedRisk}>
+                      <SelectTrigger
+                        id="marketplace-risk-filter"
+                        className="h-11"
+                      >
+                        <SelectValue placeholder="Safe" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All risks</SelectItem>
+                        {riskFilterOptions.map((risk) => (
+                          <SelectItem key={risk} value={risk}>
+                            {formatRiskLabel(risk)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <MarketplaceSkillsTable
-                  skills={visibleSkills}
+                  skills={filteredSkills}
                   installedGatewayNamesBySkillId={
                     installedGatewayNamesBySkillId
                   }
