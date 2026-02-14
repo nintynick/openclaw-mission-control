@@ -51,7 +51,7 @@ def enqueue_webhook_delivery(payload: QueuedWebhookDelivery) -> bool:
     """Persist webhook metadata in a Redis queue for batch dispatch."""
     try:
         client = _redis_client()
-        client.lpush(settings.webhook_queue_name, payload.to_json())
+        client.lpush(settings.webhook_leads_batch_redis_list_key, payload.to_json())
         logger.info(
             "webhook.queue.enqueued",
             extra={
@@ -78,7 +78,10 @@ def enqueue_webhook_delivery(payload: QueuedWebhookDelivery) -> bool:
 def dequeue_webhook_delivery() -> QueuedWebhookDelivery | None:
     """Pop one queued webhook delivery payload."""
     client = _redis_client()
-    raw = cast(str | bytes | None, client.rpop(settings.webhook_queue_name))
+    raw = cast(
+        str | bytes | None,
+        client.rpop(settings.webhook_leads_batch_redis_list_key),
+    )
     if raw is None:
         return None
     if isinstance(raw, bytes):

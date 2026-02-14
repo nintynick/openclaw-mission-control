@@ -123,7 +123,11 @@ async def test_dispatch_flush_processes_items_and_throttles(monkeypatch: pytest.
 
     monkeypatch.setattr(dispatch, "_process_single_item", _process)
     monkeypatch.setattr(dispatch.settings, "webhook_dispatch_throttle_seconds", 0)
-    monkeypatch.setattr(dispatch.time, "sleep", lambda seconds: throttles.append(seconds))
+
+    async def _sleep(seconds: float) -> None:
+        throttles.append(float(seconds))
+
+    monkeypatch.setattr(dispatch.asyncio, "sleep", _sleep)
 
     await dispatch.flush_webhook_delivery_queue()
 
@@ -148,7 +152,11 @@ async def test_dispatch_flush_requeues_on_process_error(monkeypatch: pytest.Monk
     monkeypatch.setattr(dispatch, "_process_single_item", _process)
     monkeypatch.setattr(dispatch, "requeue_if_failed", _requeue)
     monkeypatch.setattr(dispatch.settings, "webhook_dispatch_throttle_seconds", 0)
-    monkeypatch.setattr(dispatch.time, "sleep", lambda seconds: None)
+
+    async def _sleep(_: float) -> None:
+        return None
+
+    monkeypatch.setattr(dispatch.asyncio, "sleep", _sleep)
 
     await dispatch.flush_webhook_delivery_queue()
 
@@ -180,7 +188,11 @@ async def test_dispatch_flush_recovers_from_dequeue_error(monkeypatch: pytest.Mo
 
     monkeypatch.setattr(dispatch, "_process_single_item", _process)
     monkeypatch.setattr(dispatch.settings, "webhook_dispatch_throttle_seconds", 0)
-    monkeypatch.setattr(dispatch.time, "sleep", lambda seconds: None)
+
+    async def _sleep(_: float) -> None:
+        return None
+
+    monkeypatch.setattr(dispatch.asyncio, "sleep", _sleep)
 
     await dispatch.flush_webhook_delivery_queue()
 

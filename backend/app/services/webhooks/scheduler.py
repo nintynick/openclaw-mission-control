@@ -14,7 +14,7 @@ from app.services.webhooks import dispatch
 def bootstrap_webhook_dispatch_schedule(interval_seconds: int | None = None) -> None:
     """Register a recurring queue-flush job and keep it idempotent."""
     connection = Redis.from_url(settings.webhook_redis_url)
-    scheduler = Scheduler(queue_name=settings.webhook_queue_name, connection=connection)
+    scheduler = Scheduler(queue_name=settings.webhook_leads_rq_queue_name, connection=connection)
 
     for job in scheduler.get_jobs():
         if job.id == settings.webhook_dispatch_schedule_id:
@@ -32,5 +32,5 @@ def bootstrap_webhook_dispatch_schedule(interval_seconds: int | None = None) -> 
         interval=effective_interval_seconds,
         repeat=None,
         id=settings.webhook_dispatch_schedule_id,
-        queue_name=settings.webhook_queue_name,
+        queue_name=settings.webhook_leads_rq_queue_name,
     )

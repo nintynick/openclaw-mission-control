@@ -206,7 +206,7 @@ async def flush_webhook_delivery_queue() -> None:
                 },
             )
             requeue_if_failed(item)
-        time.sleep(settings.webhook_dispatch_throttle_seconds)
+        await asyncio.sleep(settings.webhook_dispatch_throttle_seconds)
     logger.info("webhook.dispatch.batch_complete", extra={"count": processed})
 
 

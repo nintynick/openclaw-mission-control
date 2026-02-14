@@ -55,7 +55,17 @@ class Settings(BaseSettings):
 
     # Webhook queueing / dispatch
     webhook_redis_url: str = "redis://localhost:6379/0"
+
+    # NOTE: Deprecated. Historically used for both the Redis list key *and* the RQ queue name.
+    # Prefer `webhook_leads_batch_redis_list_key` + `webhook_leads_rq_queue_name`.
     webhook_queue_name: str = "webhook-dispatch"
+
+    # RQ queue that runs the batch dispatch job.
+    webhook_leads_rq_queue_name: str = "webhook-dispatch"
+
+    # Redis list key that stores queued webhook deliveries for batching.
+    webhook_leads_batch_redis_list_key: str = "webhook-dispatch"
+
     webhook_dispatch_schedule_id: str = "webhook-dispatch-batch"
     webhook_dispatch_throttle_seconds: float = 2.0
     webhook_dispatch_schedule_interval_seconds: int = 900
@@ -70,6 +80,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _defaults(self) -> Self:
+        # Backwards compatibility: If WEBHOOK_QUEUE_NAME was set (legacy), and the
+        # newer split settings were not explicitly set, mirror it.
+        if "webhook_queue_name" in self.model_fields_set:
+            if "webhook_leads_rq_queue_name" not in self.model_fields_set:
+                self.webhook_leads_rq_queue_name = self.webhook_queue_name
+            if "webhook_leads_batch_redis_list_key" not in self.model_fields_set:
+                self.webhook_leads_batch_redis_list_key = self.webhook_queue_name
         if self.auth_mode == AuthMode.CLERK:
             if not self.clerk_secret_key.strip():
                 raise ValueError(
