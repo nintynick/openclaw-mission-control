@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     # Periodic reconciliation safety net for mission-control/approval checks.
     github_approval_check_schedule_id: str = "mission-control-approval-check-reconcile"
     github_approval_check_schedule_interval_seconds: int = 900
+    github_approval_check_reconcile_concurrency: int = Field(default=3, ge=1, le=10)
+    github_approval_check_reconcile_max_pr_urls: int = Field(default=500, ge=1)
 
     # Database lifecycle
     db_auto_migrate: bool = False
