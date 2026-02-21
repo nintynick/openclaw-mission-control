@@ -49,6 +49,16 @@ from app.services.openclaw.shared import GatewayAgentIdentity
 
 _T = TypeVar("_T")
 
+# Files that can be edited via the agent file management API
+EDITABLE_AGENT_FILES = {
+    "IDENTITY.md",
+    "SOUL.md",
+    "BOOTSTRAP.md",
+    "AGENTS.md",
+    "TOOLS.md",
+    "HEARTBEAT.md",
+}
+
 
 class AbstractGatewayMessagingService(OpenClawDBService, ABC):
     """Shared gateway messaging primitives with retry semantics."""
@@ -470,25 +480,17 @@ class GatewayCoordinationService(AbstractGatewayMessagingService):
         else:
             files = []
 
-        # Define editable files
-        editable_files = {
-            "IDENTITY.md",
-            "SOUL.md",
-            "BOOTSTRAP.md",
-            "AGENTS.md",
-            "TOOLS.md",
-            "HEARTBEAT.md",
-        }
-
         result = []
         if isinstance(files, list):
             for file in files:
                 if isinstance(file, str):
-                    result.append({"name": file, "editable": file in editable_files})
+                    result.append({"name": file, "editable": file in EDITABLE_AGENT_FILES})
                 elif isinstance(file, dict):
                     name = file.get("name", "")
                     if isinstance(name, str):
-                        result.append({"name": name, "editable": name in editable_files})
+                        result.append(
+                            {"name": name, "editable": name in EDITABLE_AGENT_FILES}
+                        )
 
         self.logger.info(
             "gateway.coordination.files_list.success trace_id=%s board_id=%s target_agent_id=%s "
@@ -608,14 +610,17 @@ class GatewayCoordinationService(AbstractGatewayMessagingService):
             )
 
         # Update database fields for specific files
+        db_updated = False
         if filename == "SOUL.md":
             target.soul_template = normalized_content
             target.updated_at = utcnow()
-            self.session.add(target)
-            await self.session.commit()
+            db_updated = True
         elif filename == "IDENTITY.md":
             target.identity_template = normalized_content
             target.updated_at = utcnow()
+            db_updated = True
+
+        if db_updated:
             self.session.add(target)
             await self.session.commit()
 

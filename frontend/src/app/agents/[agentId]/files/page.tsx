@@ -99,16 +99,16 @@ export default function AgentFilesPage() {
         `/api/v1/agent/boards/${agent.board_id}/agents/${agentId}/files/${fileName}`,
         {
           headers: {
-            "Content-Type": "application/json",
+            Accept: "text/plain",
           },
         }
       );
       if (!response.ok) {
         throw new Error(`Failed to load file: ${response.statusText}`);
       }
-      const content = await response.text();
+      const fileContent = await response.text();
       setSelectedFile(fileName);
-      setFileContent(content);
+      setFileContent(fileContent);
       setEditDialogOpen(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load file");
