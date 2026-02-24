@@ -38,7 +38,9 @@ async def test_security_headers_middleware_appends_lowercase_raw_header_names() 
         sent_messages.append(message)
 
     middleware = SecurityHeadersMiddleware(app, x_frame_options="SAMEORIGIN")
-    await middleware({"type": "http", "method": "GET", "path": "/", "headers": []}, lambda: None, capture)
+    await middleware(
+        {"type": "http", "method": "GET", "path": "/", "headers": []}, lambda: None, capture
+    )
 
     response_start = next(
         message for message in sent_messages if message.get("type") == "http.response.start"

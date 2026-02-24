@@ -60,7 +60,8 @@ vi.mock("@clerk/nextjs", () => {
 describe("/approvals auth boundary", () => {
   it("renders without ClerkProvider runtime errors when publishable key is a placeholder", () => {
     const previousAuthMode = process.env.NEXT_PUBLIC_AUTH_MODE;
-    const previousPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    const previousPublishableKey =
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
     process.env.NEXT_PUBLIC_AUTH_MODE = "local";
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "placeholder";
