@@ -82,15 +82,25 @@ const columns: Array<{
   },
 ];
 
+/**
+ * Build compact due-date UI state for a task card.
+ *
+ * - Returns `due: undefined` when the task has no due date (or it's invalid), so
+ *   callers can omit the due-date UI entirely.
+ * - Treats a task as overdue only if it is not `done` (so "Done" tasks don't
+ *   keep showing as overdue forever).
+ */
 const resolveDueState = (
   task: Task,
 ): { due: string | undefined; isOverdue: boolean } => {
   const date = parseApiDatetime(task.due_at);
   if (!date) return { due: undefined, isOverdue: false };
+
   const dueLabel = date.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
   });
+
   const isOverdue = task.status !== "done" && date.getTime() < Date.now();
   return {
     due: isOverdue ? `Overdue · ${dueLabel}` : dueLabel,
@@ -103,6 +113,16 @@ type CardPosition = { left: number; top: number };
 const KANBAN_MOVE_ANIMATION_MS = 240;
 const KANBAN_MOVE_EASING = "cubic-bezier(0.2, 0.8, 0.2, 1)";
 
+/**
+ * Kanban-style task board with 4 columns.
+ *
+ * Notes:
+ * - Uses a lightweight FLIP animation (via `useLayoutEffect`) to animate cards
+ *   to their new positions when tasks move between columns.
+ * - Drag interactions can temporarily fight browser-managed drag images; the
+ *   animation is disabled while a card is being dragged.
+ * - Respects `prefers-reduced-motion`.
+ */
 export const TaskBoard = memo(function TaskBoard({
   tasks,
   onTaskSelect,
@@ -131,6 +151,12 @@ export const TaskBoard = memo(function TaskBoard({
     [],
   );
 
+  /**
+   * Snapshot each card's position relative to the scroll container.
+   *
+   * We store these measurements so we can compute deltas (prev - next) and
+   * apply the FLIP technique on the next render.
+   */
   const measurePositions = useCallback((): Map<string, CardPosition> => {
     const positions = new Map<string, CardPosition>();
     const container = boardRef.current;

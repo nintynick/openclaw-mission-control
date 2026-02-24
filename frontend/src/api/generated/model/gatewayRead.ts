@@ -9,12 +9,14 @@
  * Gateway payload returned from read endpoints.
  */
 export interface GatewayRead {
-  created_at: string;
-  id: string;
   name: string;
-  organization_id: string;
-  token?: string | null;
-  updated_at: string;
   url: string;
   workspace_root: string;
+  allow_insecure_tls?: boolean;
+  disable_device_pairing?: boolean;
+  id: string;
+  organization_id: string;
+  token?: string | null;
+  created_at: string;
+  updated_at: string;
 }

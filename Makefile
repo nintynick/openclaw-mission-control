@@ -55,10 +55,10 @@ frontend-format-check: frontend-tooling ## Check frontend formatting (prettier)
 	$(NODE_WRAP) --cwd $(FRONTEND_DIR) npx prettier --check "src/**/*.{ts,tsx,js,jsx,json,css,md}" "*.{ts,js,json,md,mdx}"
 
 .PHONY: lint
-lint: backend-lint frontend-lint ## Lint backend + frontend
+lint: backend-lint frontend-lint docs-lint ## Lint backend + frontend + docs
 
 .PHONY: backend-lint
-backend-lint: ## Lint backend (flake8)
+backend-lint: backend-format-check backend-typecheck ## Lint backend (isort/black checks + flake8 + mypy)
 	cd $(BACKEND_DIR) && uv run flake8 --config .flake8
 
 .PHONY: frontend-lint
@@ -142,8 +142,12 @@ frontend-build: frontend-tooling ## Build frontend (next build)
 api-gen: frontend-tooling ## Regenerate TS API client (requires backend running at 127.0.0.1:8000)
 	$(NODE_WRAP) --cwd $(FRONTEND_DIR) npm run api:gen
 
+.PHONY: rq-worker
+rq-worker: ## Run background queue worker loop
+	cd $(BACKEND_DIR) && uv run python ../scripts/rq worker
+
 .PHONY: backend-templates-sync
-backend-templates-sync: ## Sync templates to existing gateway agents (usage: make backend-templates-sync GATEWAY_ID=<uuid> SYNC_ARGS="--reset-sessions")
+backend-templates-sync: ## Sync templates to existing gateway agents (usage: make backend-templates-sync GATEWAY_ID=<uuid> SYNC_ARGS="--reset-sessions --overwrite")
 	@if [ -z "$(GATEWAY_ID)" ]; then echo "GATEWAY_ID is required (uuid)"; exit 1; fi
 	cd $(BACKEND_DIR) && uv run python scripts/sync_gateway_templates.py --gateway-id "$(GATEWAY_ID)" $(SYNC_ARGS)
 

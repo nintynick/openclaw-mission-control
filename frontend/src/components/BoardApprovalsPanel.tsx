@@ -148,9 +148,15 @@ const formatRubricTooltipValue = (
   );
 };
 
+/**
+ * Narrow unknown values to a plain record.
+ *
+ * Used for defensive parsing of `approval.payload` (schema can evolve).
+ */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** Safely read any value at a nested path inside an approval payload. */
 const payloadAtPath = (payload: Approval["payload"], path: string[]) => {
   let current: unknown = payload;
   for (const key of path) {
@@ -160,6 +166,12 @@ const payloadAtPath = (payload: Approval["payload"], path: string[]) => {
   return current ?? null;
 };
 
+/**
+ * Safely read a simple scalar value from an approval payload.
+ *
+ * The backend payload shape can evolve (camelCase vs snake_case). Keeping these
+ * helpers centralized makes it easier to support older approvals.
+ */
 const payloadValue = (payload: Approval["payload"], key: string) => {
   const value = payloadAtPath(payload, [key]);
   if (typeof value === "string" || typeof value === "number") {
@@ -168,12 +180,18 @@ const payloadValue = (payload: Approval["payload"], key: string) => {
   return null;
 };
 
+/**
+ * Safely read a string[] value from an approval payload.
+ *
+ * Filters non-string entries to keep UI rendering predictable.
+ */
 const payloadValues = (payload: Approval["payload"], key: string) => {
   const value = payloadAtPath(payload, [key]);
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is string => typeof item === "string");
 };
 
+/** Safely read a scalar value from an approval payload at a nested path. */
 const payloadNestedValue = (payload: Approval["payload"], path: string[]) => {
   const value = payloadAtPath(payload, path);
   if (typeof value === "string" || typeof value === "number") {
@@ -182,6 +200,7 @@ const payloadNestedValue = (payload: Approval["payload"], path: string[]) => {
   return null;
 };
 
+/** Safely read a string[] value from an approval payload at a nested path. */
 const payloadNestedValues = (payload: Approval["payload"], path: string[]) => {
   const value = payloadAtPath(payload, path);
   if (!Array.isArray(value)) return [];
@@ -222,6 +241,15 @@ const normalizeRubricScores = (raw: unknown): Record<string, number> => {
 const payloadRubricScores = (payload: Approval["payload"]) =>
   normalizeRubricScores(payloadAtPath(payload, ["analytics", "rubric_scores"]));
 
+/**
+ * Extract task ids referenced by an approval.
+ *
+ * Approvals can reference tasks in multiple places depending on the producer:
+ * - top-level `task_id` / `task_ids` fields
+ * - nested payload keys (task_id/taskId/taskIDs, etc.)
+ *
+ * We merge/dedupe to get a best-effort list for UI deep links.
+ */
 const approvalTaskIds = (approval: Approval) => {
   const payload = approval.payload ?? {};
   const linkedTaskIds = (approval as Approval & { task_ids?: string[] | null })
@@ -318,6 +346,12 @@ const approvalRelatedTasks = (approval: Approval): RelatedTaskSummary[] => {
 const taskHref = (boardId: string, taskId: string) =>
   `/boards/${encodeURIComponent(boardId)}?taskId=${encodeURIComponent(taskId)}`;
 
+/**
+ * Create a small, human-readable summary of an approval request.
+ *
+ * Used by the approvals panel modal: it prefers explicit fields but falls back
+ * to payload-derived values so older approvals still render well.
+ */
 const approvalSummary = (approval: Approval, boardLabel?: string | null) => {
   const payload = approval.payload ?? {};
   const taskIds = approvalTaskIds(approval);

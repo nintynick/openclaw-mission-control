@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
 
-router = APIRouter(prefix="/organizations/me/custom-fields", tags=["org-custom-fields"])
+router = APIRouter(prefix="/organizations/me/custom-fields", tags=["custom-fields"])
 SESSION_DEP = Depends(get_session)
 ORG_MEMBER_DEP = Depends(require_org_member)
 ORG_ADMIN_DEP = Depends(require_org_admin)
@@ -84,7 +84,7 @@ async def _validated_board_ids_for_org(
     normalized_board_ids = list(dict.fromkeys(board_ids))
     if not normalized_board_ids:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="At least one board must be selected.",
         )
     valid_board_ids = set(
@@ -103,7 +103,7 @@ async def _validated_board_ids_for_org(
     )
     if missing_board_ids:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={
                 "message": "Some selected boards are invalid for this organization.",
                 "invalid_board_ids": [str(value) for value in missing_board_ids],
@@ -177,7 +177,7 @@ async def create_org_custom_field(
         )
     except ValueError as err:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(err),
         ) from err
     definition = TaskCustomFieldDefinition(
@@ -252,7 +252,7 @@ async def update_org_custom_field(
         )
     except ValueError as err:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(err),
         ) from err
     for key, value in updates.items():

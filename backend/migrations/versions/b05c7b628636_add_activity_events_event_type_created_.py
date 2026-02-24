@@ -1,7 +1,7 @@
 """add activity_events event_type created_at index
 
 Revision ID: b05c7b628636
-Revises: bbd5bbb26d97
+Revises: b6f4c7d9e1a2
 Create Date: 2026-02-12 09:54:32.359256
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'b05c7b628636'
-down_revision = 'bbd5bbb26d97'
+down_revision = 'b6f4c7d9e1a2'
 branch_labels = None
 depends_on = None
 

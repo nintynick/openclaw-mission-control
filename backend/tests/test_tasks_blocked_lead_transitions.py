@@ -11,7 +11,7 @@ from sqlmodel import SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import ActorContext
-from app.api.tasks import _TaskUpdateInput, _apply_lead_task_update
+from app.api.tasks import _apply_lead_task_update, _TaskUpdateInput
 from app.models.agents import Agent
 from app.models.boards import Board
 from app.models.organizations import Organization

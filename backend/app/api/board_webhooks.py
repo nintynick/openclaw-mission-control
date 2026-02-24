@@ -11,6 +11,7 @@ from sqlmodel import col, select
 
 from app.api.deps import get_board_for_user_read, get_board_for_user_write, get_board_or_404
 from app.core.config import settings
+from app.core.logging import get_logger
 from app.core.time import utcnow
 from app.db import crud
 from app.db.pagination import paginate
@@ -29,6 +30,7 @@ from app.schemas.board_webhooks import (
 from app.schemas.common import OkResponse
 from app.schemas.pagination import DefaultLimitOffsetPage
 from app.services.openclaw.gateway_dispatch import GatewayDispatchService
+from app.services.webhooks.queue import QueuedInboundDelivery, enqueue_webhook_delivery
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -43,7 +45,7 @@ SESSION_DEP = Depends(get_session)
 BOARD_USER_READ_DEP = Depends(get_board_for_user_read)
 BOARD_USER_WRITE_DEP = Depends(get_board_for_user_write)
 BOARD_OR_404_DEP = Depends(get_board_or_404)
-PAYLOAD_PREVIEW_MAX_CHARS = 1600
+logger = get_logger(__name__)
 
 
 def _webhook_endpoint_path(board_id: UUID, webhook_id: UUID) -> str:
@@ -62,6 +64,7 @@ def _to_webhook_read(webhook: BoardWebhook) -> BoardWebhookRead:
     return BoardWebhookRead(
         id=webhook.id,
         board_id=webhook.board_id,
+        agent_id=webhook.agent_id,
         description=webhook.description,
         enabled=webhook.enabled,
         endpoint_path=endpoint_path,
@@ -176,9 +179,7 @@ def _payload_preview(
             preview = json.dumps(value, indent=2, ensure_ascii=True)
         except TypeError:
             preview = str(value)
-    if len(preview) <= PAYLOAD_PREVIEW_MAX_CHARS:
-        return preview
-    return f"{preview[: PAYLOAD_PREVIEW_MAX_CHARS - 3]}..."
+    return preview
 
 
 def _webhook_memory_content(
@@ -206,12 +207,18 @@ async def _notify_lead_on_webhook_payload(
     webhook: BoardWebhook,
     payload: BoardWebhookPayload,
 ) -> None:
-    lead = (
-        await Agent.objects.filter_by(board_id=board.id)
-        .filter(col(Agent.is_board_lead).is_(True))
-        .first(session)
-    )
-    if lead is None or not lead.openclaw_session_id:
+    target_agent: Agent | None = None
+    if webhook.agent_id is not None:
+        target_agent = await Agent.objects.filter_by(id=webhook.agent_id, board_id=board.id).first(
+            session
+        )
+    if target_agent is None:
+        target_agent = (
+            await Agent.objects.filter_by(board_id=board.id)
+            .filter(col(Agent.is_board_lead).is_(True))
+            .first(session)
+        )
+    if target_agent is None or not target_agent.openclaw_session_id:
         return
 
     dispatch = GatewayDispatchService(session)
@@ -236,12 +243,28 @@ async def _notify_lead_on_webhook_payload(
         f"GET /api/v1/agent/boards/{board.id}/memory?is_chat=false"
     )
     await dispatch.try_send_agent_message(
-        session_key=lead.openclaw_session_id,
+        session_key=target_agent.openclaw_session_id,
         config=config,
-        agent_name=lead.name,
+        agent_name=target_agent.name,
         message=message,
         deliver=False,
     )
+
+
+async def _validate_agent_id(
+    *,
+    session: AsyncSession,
+    board: Board,
+    agent_id: UUID | None,
+) -> None:
+    if agent_id is None:
+        return
+    agent = await Agent.objects.filter_by(id=agent_id, board_id=board.id).first(session)
+    if agent is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="agent_id must reference an agent on this board.",
+        )
 
 
 @router.get("", response_model=DefaultLimitOffsetPage[BoardWebhookRead])
@@ -270,8 +293,14 @@ async def create_board_webhook(
     session: AsyncSession = SESSION_DEP,
 ) -> BoardWebhookRead:
     """Create a new board webhook with a generated UUID endpoint."""
+    await _validate_agent_id(
+        session=session,
+        board=board,
+        agent_id=payload.agent_id,
+    )
     webhook = BoardWebhook(
         board_id=board.id,
+        agent_id=payload.agent_id,
         description=payload.description,
         enabled=payload.enabled,
     )
@@ -309,6 +338,11 @@ async def update_board_webhook(
     )
     updates = payload.model_dump(exclude_unset=True)
     if updates:
+        await _validate_agent_id(
+            session=session,
+            board=board,
+            agent_id=updates.get("agent_id"),
+        )
         crud.apply_updates(webhook, updates)
         webhook.updated_at = utcnow()
         await crud.save(session, webhook)
@@ -405,6 +439,15 @@ async def ingest_board_webhook(
         board_id=board.id,
         webhook_id=webhook_id,
     )
+    logger.info(
+        "webhook.ingest.received",
+        extra={
+            "board_id": str(board.id),
+            "webhook_id": str(webhook.id),
+            "source_ip": request.client.host if request.client else None,
+            "content_type": request.headers.get("content-type"),
+        },
+    )
     if not webhook.enabled:
         raise HTTPException(
             status_code=status.HTTP_410_GONE,
@@ -412,6 +455,7 @@ async def ingest_board_webhook(
         )
 
     content_type = request.headers.get("content-type")
+    headers = _captured_headers(request)
     payload_value = _decode_payload(
         await request.body(),
         content_type=content_type,
@@ -420,7 +464,7 @@ async def ingest_board_webhook(
         board_id=board.id,
         webhook_id=webhook.id,
         payload=payload_value,
-        headers=_captured_headers(request),
+        headers=headers,
         source_ip=request.client.host if request.client else None,
         content_type=content_type,
     )
@@ -438,12 +482,42 @@ async def ingest_board_webhook(
     )
     session.add(memory)
     await session.commit()
-    await _notify_lead_on_webhook_payload(
-        session=session,
-        board=board,
-        webhook=webhook,
-        payload=payload,
+    logger.info(
+        "webhook.ingest.persisted",
+        extra={
+            "payload_id": str(payload.id),
+            "board_id": str(board.id),
+            "webhook_id": str(webhook.id),
+            "memory_id": str(memory.id),
+        },
     )
+
+    enqueued = enqueue_webhook_delivery(
+        QueuedInboundDelivery(
+            board_id=board.id,
+            webhook_id=webhook.id,
+            payload_id=payload.id,
+            received_at=payload.received_at,
+        ),
+    )
+    logger.info(
+        "webhook.ingest.enqueued",
+        extra={
+            "payload_id": str(payload.id),
+            "board_id": str(board.id),
+            "webhook_id": str(webhook.id),
+            "enqueued": enqueued,
+        },
+    )
+    if not enqueued:
+        # Preserve historical behavior by still notifying synchronously if queueing fails.
+        await _notify_lead_on_webhook_payload(
+            session=session,
+            board=board,
+            webhook=webhook,
+            payload=payload,
+        )
+
     return BoardWebhookIngestResponse(
         board_id=board.id,
         webhook_id=webhook.id,

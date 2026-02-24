@@ -40,7 +40,11 @@ type DropdownSelectProps = {
   emptyMessage?: string;
 };
 
-// Resolve trigger placeholder text with explicit prop override first, then accessible fallback.
+/**
+ * Derive a human-friendly trigger placeholder from an accessible `ariaLabel`.
+ *
+ * Keeps placeholder strings consistent even when callers only provide aria text.
+ */
 const resolvePlaceholder = (ariaLabel: string, placeholder?: string) => {
   if (placeholder) {
     return placeholder;
@@ -52,7 +56,11 @@ const resolvePlaceholder = (ariaLabel: string, placeholder?: string) => {
   return trimmed.endsWith("...") ? trimmed : `${trimmed}...`;
 };
 
-// Resolve search input placeholder from explicit override or a normalized aria label.
+/**
+ * Search input placeholder derived from `ariaLabel`.
+ *
+ * Example: ariaLabel="Select agent" -> "Search agent...".
+ */
 const resolveSearchPlaceholder = (
   ariaLabel: string,
   searchPlaceholder?: string,

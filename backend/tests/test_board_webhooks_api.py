@@ -23,6 +23,7 @@ from app.models.board_webhooks import BoardWebhook
 from app.models.boards import Board
 from app.models.gateways import Gateway
 from app.models.organizations import Organization
+from app.services.webhooks.queue import QueuedInboundDelivery
 
 
 async def _make_engine() -> AsyncEngine:
@@ -112,7 +113,7 @@ async def _seed_webhook(
 
 
 @pytest.mark.asyncio
-async def test_ingest_board_webhook_stores_payload_and_notifies_lead(
+async def test_ingest_board_webhook_stores_payload_and_enqueues_for_lead_dispatch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     engine = await _make_engine()
@@ -122,16 +123,22 @@ async def test_ingest_board_webhook_stores_payload_and_notifies_lead(
         expire_on_commit=False,
     )
     app = _build_test_app(session_maker)
+    enqueued: list[dict[str, object]] = []
     sent_messages: list[dict[str, str]] = []
 
     async with session_maker() as session:
         board, webhook = await _seed_webhook(session, enabled=True)
 
-    async def _fake_optional_gateway_config_for_board(
-        self: board_webhooks.GatewayDispatchService,
-        _board: Board,
-    ) -> object:
-        return object()
+    def _fake_enqueue(payload: QueuedInboundDelivery) -> bool:
+        enqueued.append(
+            {
+                "board_id": str(payload.board_id),
+                "webhook_id": str(payload.webhook_id),
+                "payload_id": str(payload.payload_id),
+                "attempts": payload.attempts,
+            },
+        )
+        return True
 
     async def _fake_try_send_agent_message(
         self: board_webhooks.GatewayDispatchService,
@@ -145,7 +152,7 @@ async def test_ingest_board_webhook_stores_payload_and_notifies_lead(
         del self, config, deliver
         sent_messages.append(
             {
-                "session_key": session_key,
+                "session_id": session_key,
                 "agent_name": agent_name,
                 "message": message,
             },
@@ -153,9 +160,9 @@ async def test_ingest_board_webhook_stores_payload_and_notifies_lead(
         return None
 
     monkeypatch.setattr(
-        board_webhooks.GatewayDispatchService,
-        "optional_gateway_config_for_board",
-        _fake_optional_gateway_config_for_board,
+        board_webhooks,
+        "enqueue_webhook_delivery",
+        _fake_enqueue,
     )
     monkeypatch.setattr(
         board_webhooks.GatewayDispatchService,
@@ -204,11 +211,12 @@ async def test_ingest_board_webhook_stores_payload_and_notifies_lead(
             assert f"payload:{payload_id}" in memory_items[0].tags
             assert f"Payload ID: {payload_id}" in memory_items[0].content
 
-        assert len(sent_messages) == 1
-        assert sent_messages[0]["session_key"] == "lead:session:key"
-        assert "WEBHOOK EVENT RECEIVED" in sent_messages[0]["message"]
-        assert str(payload_id) in sent_messages[0]["message"]
-        assert webhook.description in sent_messages[0]["message"]
+        assert len(enqueued) == 1
+        assert enqueued[0]["board_id"] == str(board.id)
+        assert enqueued[0]["webhook_id"] == str(webhook.id)
+        assert enqueued[0]["payload_id"] == str(payload_id)
+
+        assert len(sent_messages) == 0
     finally:
         await engine.dispose()
 

@@ -10,7 +10,9 @@
  */
 export interface GatewayCreate {
   name: string;
-  token?: string | null;
   url: string;
   workspace_root: string;
+  allow_insecure_tls?: boolean;
+  disable_device_pairing?: boolean;
+  token?: string | null;
 }

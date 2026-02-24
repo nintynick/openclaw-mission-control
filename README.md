@@ -1,11 +1,15 @@
 # OpenClaw Mission Control
 
-[![CI](https://github.com/abhi1693/openclaw-mission-control/actions/workflows/ci.yml/badge.svg)](https://github.com/abhi1693/openclaw-mission-control/actions/workflows/ci.yml)
+[![CI](https://github.com/abhi1693/openclaw-mission-control/actions/workflows/ci.yml/badge.svg)](https://github.com/abhi1693/openclaw-mission-control/actions/workflows/ci.yml) ![Static Badge](https://img.shields.io/badge/Join-Slack-active?style=flat&color=blue&link=https%3A%2F%2Fjoin.slack.com%2Ft%2Foc-mission-control%2Fshared_invite%2Fzt-3qpcm57xh-AI9C~smc3MDBVzEhvwf7gg)
 
 OpenClaw Mission Control is the centralized operations and governance platform for running OpenClaw across teams and organizations, with unified visibility, approval controls, and gateway-aware orchestration.
 It gives operators a single interface for work orchestration, agent and gateway management, approval-driven governance, and API-backed automation.
 
-<img width="1878" height="870" alt="Mission Control dashboard" src="https://github.com/user-attachments/assets/b432d66f-8c9b-4c5e-b7e5-81c86a73aa7d" />
+<img width="1896" height="869" alt="Mission Control dashboard" src="https://github.com/user-attachments/assets/49a3c823-6aaf-4c56-8328-fb1485ee940f" />
+<img width="1896" height="858" alt="image" src="https://github.com/user-attachments/assets/2bfee13a-3dab-4f4a-9135-e47bb6949dcf" />
+<img width="1890" height="865" alt="image" src="https://github.com/user-attachments/assets/84c2e867-5dc7-4a36-9290-e29179d2a659" />
+<img width="1912" height="881" alt="image" src="https://github.com/user-attachments/assets/3bbd825c-9969-4bbf-bf31-987f9168f370" />
+<img width="1902" height="878" alt="image" src="https://github.com/user-attachments/assets/eea09632-60e4-4d6d-9e6e-bdfa0ac97630" />
 
 ## Platform overview
 

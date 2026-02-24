@@ -58,6 +58,22 @@ INCLUDE_SELF_QUERY = Query(default=False)
 INCLUDE_DONE_QUERY = Query(default=False)
 PER_BOARD_TASK_LIMIT_QUERY = Query(default=5, ge=0, le=100)
 AGENT_BOARD_ROLE_TAGS = cast("list[str | Enum]", ["agent-lead", "agent-worker"])
+_ERR_GATEWAY_MAIN_AGENT_REQUIRED = (
+    "gateway must have a gateway main agent before boards can be created or updated"
+)
+
+
+async def _require_gateway_main_agent(session: AsyncSession, gateway: Gateway) -> None:
+    main_agent = (
+        await Agent.objects.filter_by(gateway_id=gateway.id)
+        .filter(col(Agent.board_id).is_(None))
+        .first(session)
+    )
+    if main_agent is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=_ERR_GATEWAY_MAIN_AGENT_REQUIRED,
+        )
 
 
 async def _require_gateway(
@@ -69,14 +85,15 @@ async def _require_gateway(
     gateway = await crud.get_by_id(session, Gateway, gateway_id)
     if gateway is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="gateway_id is invalid",
         )
     if organization_id is not None and gateway.organization_id != organization_id:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="gateway_id is invalid",
         )
+    await _require_gateway_main_agent(session, gateway)
     return gateway
 
 
@@ -101,12 +118,12 @@ async def _require_board_group(
     group = await crud.get_by_id(session, BoardGroup, board_group_id)
     if group is None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="board_group_id is invalid",
         )
     if organization_id is not None and group.organization_id != organization_id:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="board_group_id is invalid",
         )
     return group
@@ -153,14 +170,19 @@ async def _apply_board_update(
     if updates.get("board_type") == "goal" and (not board.objective or not board.success_metrics):
         # Validate only when explicitly switching to goal boards.
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Goal boards require objective and success_metrics",
         )
     if not board.gateway_id:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="gateway_id is required",
         )
+    await _require_gateway(
+        session,
+        board.gateway_id,
+        organization_id=board.organization_id,
+    )
     board.updated_at = utcnow()
     return await crud.save(session, board)
 

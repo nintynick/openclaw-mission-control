@@ -243,6 +243,32 @@ const toLiveFeedFromComment = (comment: TaskCommentRead): LiveFeedItem => ({
   event_type: "task.comment",
 });
 
+const mergeCommentsById = (...collections: TaskComment[][]): TaskComment[] => {
+  const byId = new Map<string, TaskComment>();
+  for (const collection of collections) {
+    for (const comment of collection) {
+      const existing = byId.get(comment.id);
+      if (!existing) {
+        byId.set(comment.id, comment);
+        continue;
+      }
+      const existingTime = apiDatetimeToMs(existing.created_at) ?? 0;
+      const incomingTime = apiDatetimeToMs(comment.created_at) ?? 0;
+      byId.set(
+        comment.id,
+        incomingTime >= existingTime
+          ? { ...existing, ...comment }
+          : { ...comment, ...existing },
+      );
+    }
+  }
+  return [...byId.values()].sort((a, b) => {
+    const aTime = apiDatetimeToMs(a.created_at) ?? 0;
+    const bTime = apiDatetimeToMs(b.created_at) ?? 0;
+    return bTime - aTime;
+  });
+};
+
 const toLiveFeedFromBoardChat = (memory: BoardChatMessage): LiveFeedItem => {
   const content = (memory.content ?? "").trim();
   const actorName = resolveHumanActorName(memory.source, DEFAULT_HUMAN_LABEL);
@@ -1289,6 +1315,12 @@ export default function BoardDetailPage() {
     return () => window.clearTimeout(timeout);
   }, [chatMessages, isChatOpen]);
 
+  /**
+   * Returns an ISO timestamp for the newest board chat message.
+   *
+   * Used as the `since` cursor when (re)connecting to the SSE endpoint so we
+   * don't re-stream the entire chat log.
+   */
   const latestChatTimestamp = (items: BoardChatMessage[]) => {
     if (!items.length) return undefined;
     const latest = items.reduce((max, item) => {
@@ -1347,9 +1379,9 @@ export default function BoardDetailPage() {
         while (!isCancelled) {
           const { value, done } = await reader.read();
           if (done) break;
+          // Consider the stream healthy once we receive any bytes (including pings)
+          // and reset the backoff so a later disconnect doesn't wait the full max.
           if (value && value.length) {
-            // Consider the stream "healthy" once we receive any bytes (including pings),
-            // then reset the backoff for future reconnects.
             backoff.reset();
           }
           buffer += decoder.decode(value, { stream: true });
@@ -1694,35 +1726,9 @@ export default function BoardDetailPage() {
                     ) {
                       return prev;
                     }
-                    const exists = prev.some(
-                      (item) => item.id === payload.comment?.id,
-                    );
-                    if (exists) {
-                      return prev;
-                    }
-                    const createdMs = apiDatetimeToMs(
-                      payload.comment?.created_at,
-                    );
-                    if (prev.length === 0 || createdMs === null) {
-                      return [payload.comment as TaskComment, ...prev];
-                    }
-                    const first = prev[0];
-                    const firstMs = apiDatetimeToMs(first?.created_at);
-                    if (firstMs !== null && createdMs >= firstMs) {
-                      return [payload.comment as TaskComment, ...prev];
-                    }
-                    const last = prev[prev.length - 1];
-                    const lastMs = apiDatetimeToMs(last?.created_at);
-                    if (lastMs !== null && createdMs <= lastMs) {
-                      return [...prev, payload.comment as TaskComment];
-                    }
-                    const next = [...prev, payload.comment as TaskComment];
-                    next.sort((a, b) => {
-                      const aTime = apiDatetimeToMs(a.created_at) ?? 0;
-                      const bTime = apiDatetimeToMs(b.created_at) ?? 0;
-                      return bTime - aTime;
-                    });
-                    return next;
+                    return mergeCommentsById(prev, [
+                      payload.comment as TaskComment,
+                    ]);
                   });
                 } else if (payload.task) {
                   const incomingTask = payload.task;
@@ -2337,13 +2343,7 @@ export default function BoardDetailPage() {
             taskId,
           );
         if (result.status !== 200) throw new Error("Unable to load comments.");
-        const items = [...(result.data.items ?? [])];
-        items.sort((a, b) => {
-          const aTime = apiDatetimeToMs(a.created_at) ?? 0;
-          const bTime = apiDatetimeToMs(b.created_at) ?? 0;
-          return bTime - aTime;
-        });
-        setComments(items);
+        setComments(mergeCommentsById(result.data.items ?? []));
       } catch (err) {
         setCommentsError(
           err instanceof Error ? err.message : "Something went wrong.",
@@ -2515,7 +2515,7 @@ export default function BoardDetailPage() {
         );
       if (result.status !== 200) throw new Error("Unable to send message.");
       const created = result.data;
-      setComments((prev) => [created, ...prev]);
+      setComments((prev) => mergeCommentsById([created], prev));
       return true;
     } catch (err) {
       const message = formatActionError(err, "Unable to send message.");

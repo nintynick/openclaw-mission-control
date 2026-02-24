@@ -17,8 +17,8 @@ from app.core.error_handling import (
     _http_exception_exception_handler,
     _json_safe,
     _request_validation_exception_handler,
-    _response_validation_exception_handler,
     _request_validation_handler,
+    _response_validation_exception_handler,
     _response_validation_handler,
     install_error_handling,
 )
