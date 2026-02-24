@@ -235,20 +235,26 @@ describe("/boards/:id task board", () => {
 
     // Open create task flow.
     // Board page uses an icon-only button with aria-label="New task".
-    cy.get('button[aria-label="New task"]').click({ force: true });
+    cy.get('button[aria-label="New task"]')
+      .should("be.visible")
+      .and("not.be.disabled")
+      .click();
 
     cy.contains('[role="dialog"]', "New task")
       .should("be.visible")
       .within(() => {
         cy.contains("label", "Title").parent().find("input").type("New task");
-        cy.contains("button", /^Create task$/).click({ force: true });
+        cy.contains("button", /^Create task$/)
+          .should("be.visible")
+          .and("not.be.disabled")
+          .click();
       });
     cy.wait(["@createTask"]);
 
     cy.contains("New task").should("be.visible");
 
     // Open edit task dialog.
-    cy.contains("Inbox task").click({ force: true });
+    cy.contains("Inbox task").scrollIntoView().should("be.visible").click();
     cy.wait(["@taskComments"]);
     cy.contains(/task detail/i).should("be.visible");
     openEditTaskDialog();
@@ -258,13 +264,16 @@ describe("/boards/:id task board", () => {
       cy.contains("label", "Status")
         .parent()
         .within(() => {
-          cy.get('[role="combobox"]').first().click({ force: true });
+          cy.get('[role="combobox"]').first().should("be.visible").click();
         });
     });
 
-    cy.contains("In progress").click({ force: true });
+    cy.contains("In progress").should("be.visible").click();
 
-    cy.contains("button", /save changes/i).click({ force: true });
+    cy.contains("button", /save changes/i)
+      .should("be.visible")
+      .and("not.be.disabled")
+      .click();
     cy.wait(["@updateTask"]);
     cy.get('[aria-label="Edit task"]').should("not.exist");
 
@@ -274,11 +283,17 @@ describe("/boards/:id task board", () => {
 
     // Delete task via delete dialog.
     cy.get('[aria-label="Edit task"]').within(() => {
-      cy.contains("button", /^Delete task$/).click({ force: true });
+      cy.contains("button", /^Delete task$/)
+        .should("be.visible")
+        .and("not.be.disabled")
+        .click();
     });
     cy.get('[aria-label="Delete task"]').should("be.visible");
     cy.get('[aria-label="Delete task"]').within(() => {
-      cy.contains("button", /^Delete task$/).click({ force: true });
+      cy.contains("button", /^Delete task$/)
+        .should("be.visible")
+        .and("not.be.disabled")
+        .click();
     });
     cy.wait(["@deleteTask"]);
 
