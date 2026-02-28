@@ -58,6 +58,7 @@ class OrganizationMemberRead(SQLModel):
     role: str
     all_boards_read: bool
     all_boards_write: bool
+    reputation_score: float = 0.0
     created_at: datetime
     updated_at: datetime
     user: OrganizationUserRead | None = None

@@ -13,6 +13,14 @@ from app.models.base import QueryModel
 
 RUNTIME_ANNOTATION_TYPES = (datetime,)
 
+ZONE_STATUSES = {"draft", "active", "suspended", "archived"}
+ZONE_STATUS_TRANSITIONS: dict[str, set[str]] = {
+    "draft": {"active", "archived"},
+    "active": {"suspended", "archived"},
+    "suspended": {"active", "archived"},
+    "archived": set(),  # terminal
+}
+
 
 class TrustZone(QueryModel, table=True):
     """Hierarchical governance zone scoping delegation, constraints, and policy."""

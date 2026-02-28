@@ -11,6 +11,7 @@ from fastapi.openapi.utils import get_openapi
 from fastapi_pagination import add_pagination
 
 from app.api.activity import router as activity_router
+from app.api.audit import router as audit_router
 from app.api.agent import router as agent_router
 from app.api.agents import router as agents_router
 from app.api.approvals import router as approvals_router
@@ -135,6 +136,10 @@ OPENAPI_TAGS = [
     {
         "name": "evaluations",
         "description": "Post-completion evaluation, scoring, and incentive signal management endpoints.",
+    },
+    {
+        "name": "audit",
+        "description": "Governance audit trail query endpoints.",
     },
     {
         "name": "proposals",
@@ -574,6 +579,7 @@ api_v1.include_router(approvals_router)
 api_v1.include_router(tasks_router)
 api_v1.include_router(task_custom_fields_router)
 api_v1.include_router(tags_router)
+api_v1.include_router(audit_router)
 api_v1.include_router(escalations_router)
 api_v1.include_router(evaluations_router)
 api_v1.include_router(proposals_router)

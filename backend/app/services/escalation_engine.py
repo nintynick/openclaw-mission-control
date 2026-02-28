@@ -385,9 +385,73 @@ async def check_auto_escalation(
             proposal.updated_at = now
             session.add(proposal)
 
+            # Gap 9: Record audit for auto-escalation
+            await record_audit(
+                session,
+                organization_id=proposal.organization_id,
+                actor_id=proposal.proposer_id,
+                actor_type="system",
+                action="escalation.auto.timeout",
+                zone_id=zone.id,
+                target_type="escalation",
+                target_id=escalation.id,
+                payload={"reason": escalation.reason},
+                commit=False,
+            )
+
             await session.commit()
             await session.refresh(escalation)
             return escalation
+
+    # Gap 9: Deadlock detection
+    auto_escalate_on_deadlock = policy.get("auto_escalate_on_deadlock", False)
+    if auto_escalate_on_deadlock:
+        from app.models.approval_requests import ApprovalRequest
+
+        all_requests = await ApprovalRequest.objects.filter_by(
+            proposal_id=proposal.id,
+        ).all(session)
+        decided = [r for r in all_requests if r.decision is not None]
+        if len(decided) == len(all_requests) and len(all_requests) > 0:
+            approvals_count = sum(1 for r in decided if r.decision == "approve")
+            rejections_count = sum(1 for r in decided if r.decision == "reject")
+            if approvals_count == rejections_count:
+                # Deadlock — escalate
+                escalation = Escalation(
+                    organization_id=proposal.organization_id,
+                    escalation_type="action",
+                    source_proposal_id=proposal.id,
+                    source_zone_id=zone.id,
+                    target_zone_id=zone.parent_zone_id,
+                    escalator_id=proposal.proposer_id,
+                    reason="Auto-escalated: reviewer deadlock detected",
+                    status="accepted",
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(escalation)
+
+                proposal.status = "escalated"
+                proposal.updated_at = now
+                session.add(proposal)
+
+                # Record audit for deadlock escalation
+                await record_audit(
+                    session,
+                    organization_id=proposal.organization_id,
+                    actor_id=proposal.proposer_id,
+                    actor_type="system",
+                    action="escalation.auto.deadlock",
+                    zone_id=zone.id,
+                    target_type="escalation",
+                    target_id=escalation.id,
+                    payload={"reason": escalation.reason},
+                    commit=False,
+                )
+
+                await session.commit()
+                await session.refresh(escalation)
+                return escalation
 
     return None
 
@@ -422,3 +486,27 @@ async def _check_rate_limit(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Escalation rate limit exceeded: maximum {max_per_day} per day in this zone",
         )
+
+
+async def sweep_auto_escalations(session: AsyncSession) -> int:
+    """Query all pending_review proposals and check auto-escalation for each.
+
+    Returns the number of proposals that were auto-escalated.
+    """
+    proposals = await Proposal.objects.filter_by(
+        status="pending_review",
+    ).all(session)
+
+    escalated = 0
+    for proposal in proposals:
+        try:
+            result = await check_auto_escalation(session, proposal=proposal)
+            if result is not None:
+                escalated += 1
+        except Exception:
+            logger.warning(
+                "Auto-escalation check failed for proposal %s",
+                proposal.id,
+                exc_info=True,
+            )
+    return escalated

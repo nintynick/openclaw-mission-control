@@ -69,6 +69,7 @@ class TrustZoneUpdate(SQLModel):
     name: str | None = None
     description: str | None = None
     status: str | None = None
+    parent_zone_id: UUID | None = None
     responsibilities: dict[str, object] | None = None
     resource_scope: dict[str, object] | None = None
     agent_qualifications: dict[str, object] | None = None

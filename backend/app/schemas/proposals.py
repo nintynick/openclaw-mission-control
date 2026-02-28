@@ -34,6 +34,8 @@ class ProposalRead(SQLModel):
     proposal_type: str
     payload: dict[str, object] | None = None
     status: str
+    risk_level: str | None = None
+    conflicts_detected: list[dict[str, object]] | None = None
     decision_model_override: dict[str, object] | None = None
     legacy_approval_id: UUID | None = None
     created_at: datetime

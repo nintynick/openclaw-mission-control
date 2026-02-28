@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import col
 
 from app.api.deps import require_org_member
-from app.core.auth import get_auth_context
+from app.core.auth import AuthContext, get_auth_context
 from app.db.session import get_session
 from app.models.approval_requests import ApprovalRequest
 from app.models.proposals import Proposal
@@ -28,8 +28,6 @@ from app.services.permission_resolver import check_resource_scope, resolve_zone_
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
-
-    from app.core.auth import AuthContext
 
 router = APIRouter(prefix="/organizations/me/proposals", tags=["proposals"])
 SESSION_DEP = Depends(get_session)
@@ -138,6 +136,44 @@ async def create_proposal_endpoint(
         proposal_id=proposal.id,
     ).all(session)
     return _proposal_to_read(proposal, requests)
+
+
+@router.get("/pending-reviews", response_model=list[ProposalRead])
+async def list_pending_reviews(
+    session: AsyncSession = SESSION_DEP,
+    auth: AuthContext = AUTH_DEP,
+    ctx: OrganizationContext = ORG_MEMBER_DEP,
+) -> list[ProposalRead]:
+    """Proposals where the current member has undecided ApprovalRequests."""
+    if auth.user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+    # Find all approval requests assigned to this member that are undecided
+    undecided_requests = await ApprovalRequest.objects.filter_by(
+        reviewer_id=ctx.member.id,
+    ).filter(
+        col(ApprovalRequest.decision) == None,  # noqa: E711
+    ).all(session)
+
+    if not undecided_requests:
+        return []
+
+    # Get the associated proposals that are pending_review and belong to the org
+    proposal_ids = {r.proposal_id for r in undecided_requests}
+    result: list[ProposalRead] = []
+    for pid in proposal_ids:
+        proposal = await Proposal.objects.by_id(pid).first(session)
+        if (
+            proposal is not None
+            and proposal.organization_id == ctx.organization.id
+            and proposal.status == "pending_review"
+        ):
+            requests = await ApprovalRequest.objects.filter_by(
+                proposal_id=proposal.id,
+            ).all(session)
+            result.append(_proposal_to_read(proposal, requests))
+
+    return result
 
 
 @router.get("", response_model=list[ProposalRead])

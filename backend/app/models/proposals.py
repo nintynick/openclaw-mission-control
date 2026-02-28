@@ -34,6 +34,10 @@ class Proposal(QueryModel, table=True):
     legacy_approval_id: UUID | None = Field(
         default=None, foreign_key="approvals.id", index=True
     )
+    risk_level: str | None = Field(default=None, index=True)
+    conflicts_detected: dict[str, object] | None = Field(
+        default=None, sa_column=Column(JSON)
+    )
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
     expires_at: datetime | None = None

@@ -54,7 +54,10 @@ Respond with a JSON object:
 }
 ```
 
-Select between 1 and 5 reviewers based on the proposal complexity and zone decision model."""
+Select between 1 and 5 reviewers based on the proposal complexity and zone decision model.
+
+Additionally, if you can determine a risk level for the proposal, include a "risk_level" field in the top-level JSON (one of "low", "medium", "high", "critical").
+If you want to override the zone's decision model, include a "decision_model_override" object in the top-level JSON."""
 
 DEFAULT_MODEL = "claude-sonnet-4-20250514"
 
@@ -79,6 +82,9 @@ class ReviewerSelection:
 
     reviewer_id: UUID
     reason: str
+    risk_level: str | None = None
+    decision_model_override: dict[str, object] | None = None
+    conflicts_detected: list[dict[str, object]] | None = None
 
 
 class GardenerService:
@@ -230,6 +236,14 @@ class GardenerService:
 
         from uuid import UUID as _UUID
 
+        # Gap 12: Parse enriched fields from LLM response
+        top_risk_level = result.get("risk_level")
+        if not isinstance(top_risk_level, str) or top_risk_level not in ("low", "medium", "high", "critical"):
+            top_risk_level = None
+        top_dm_override = result.get("decision_model_override")
+        if not isinstance(top_dm_override, dict):
+            top_dm_override = None
+
         selections = []
         for s in result.get("selections", []):
             try:
@@ -237,6 +251,8 @@ class GardenerService:
                     ReviewerSelection(
                         reviewer_id=_UUID(s["reviewer_id"]),
                         reason=s.get("reason", "Selected by Gardener AI"),
+                        risk_level=top_risk_level,
+                        decision_model_override=top_dm_override,
                     )
                 )
             except (KeyError, ValueError):

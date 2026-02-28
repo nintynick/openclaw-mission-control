@@ -137,6 +137,36 @@ async def flush_queue(*, block: bool = False, block_timeout: float = 0) -> int:
     return processed
 
 
+_ESCALATION_SWEEP_INTERVAL_SECONDS = 300.0  # 5 minutes
+_last_escalation_sweep: float = 0.0
+
+
+async def _maybe_run_escalation_sweep() -> None:
+    """Run escalation sweep if enough time has passed since the last one."""
+    import time
+
+    global _last_escalation_sweep
+    now = time.monotonic()
+    if now - _last_escalation_sweep < _ESCALATION_SWEEP_INTERVAL_SECONDS:
+        return
+    _last_escalation_sweep = now
+
+    try:
+        from app.db.session import async_session_maker
+
+        async with async_session_maker() as session:
+            from app.services.escalation_engine import sweep_auto_escalations
+
+            count = await sweep_auto_escalations(session)
+            if count > 0:
+                logger.info(
+                    "queue.worker.escalation_sweep",
+                    extra={"escalated": count},
+                )
+    except Exception:
+        logger.warning("queue.worker.escalation_sweep_failed", exc_info=True)
+
+
 async def _run_worker_loop() -> None:
     while True:
         try:
@@ -145,6 +175,8 @@ async def _run_worker_loop() -> None:
                 # Keep a finite timeout so scheduled tasks are periodically drained.
                 block_timeout=_WORKER_BLOCK_TIMEOUT_SECONDS,
             )
+            # Gap 9: Periodically sweep for auto-escalations
+            await _maybe_run_escalation_sweep()
         except Exception:
             logger.exception(
                 "queue.worker.loop_failed",

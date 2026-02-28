@@ -168,10 +168,14 @@ async def finalize_evaluation(
     evaluation.updated_at = now
     session.add(evaluation)
 
+    # Gap 14: Load zone for incentive_model config
+    eval_zone = await TrustZone.objects.by_id(evaluation.zone_id).first(session)
+
     # Generate incentive signals for executor
     signals = _generate_incentive_signals(
         evaluation=evaluation,
         aggregate=aggregate,
+        zone=eval_zone,
     )
     for signal in signals:
         session.add(signal)
@@ -240,25 +244,51 @@ def _generate_incentive_signals(
     *,
     evaluation: Evaluation,
     aggregate: dict[str, object],
+    zone: TrustZone | None = None,
 ) -> list[IncentiveSignal]:
-    """Generate incentive signals based on evaluation aggregate."""
+    """Generate incentive signals based on evaluation aggregate.
+
+    Gap 14: When a zone is provided, reads thresholds and magnitudes from
+    zone.incentive_model to customize signal generation.
+    """
     overall = aggregate.get("overall_score", 0.0)
     if not isinstance(overall, (int, float)):
         return []
 
     now = utcnow()
 
-    if overall >= 0.8:
+    # Gap 14: Read thresholds from zone.incentive_model
+    incentive_cfg: dict[str, object] = {}
+    if zone is not None and isinstance(zone.incentive_model, dict):
+        incentive_cfg = zone.incentive_model
+
+    positive_threshold = incentive_cfg.get("positive_threshold", 0.8)
+    if not isinstance(positive_threshold, (int, float)):
+        positive_threshold = 0.8
+    neutral_threshold = incentive_cfg.get("neutral_threshold", 0.4)
+    if not isinstance(neutral_threshold, (int, float)):
+        neutral_threshold = 0.4
+
+    if overall >= positive_threshold:
         signal_type = "positive"
-        magnitude = min(overall * 1.5, 2.0)
+        default_magnitude = min(overall * 1.5, 2.0)
+        magnitude = incentive_cfg.get("positive_magnitude", default_magnitude)
+        if not isinstance(magnitude, (int, float)):
+            magnitude = default_magnitude
         reason = f"High evaluation score: {overall:.2f}"
-    elif overall >= 0.4:
+    elif overall >= neutral_threshold:
         signal_type = "neutral"
-        magnitude = 0.5
+        default_magnitude = 0.5
+        magnitude = incentive_cfg.get("neutral_magnitude", default_magnitude)
+        if not isinstance(magnitude, (int, float)):
+            magnitude = default_magnitude
         reason = f"Average evaluation score: {overall:.2f}"
     else:
         signal_type = "negative"
-        magnitude = max(1.0 - overall, 0.5)
+        default_magnitude = max(1.0 - overall, 0.5)
+        magnitude = incentive_cfg.get("negative_magnitude", default_magnitude)
+        if not isinstance(magnitude, (int, float)):
+            magnitude = default_magnitude
         reason = f"Low evaluation score: {overall:.2f}"
 
     return [
@@ -266,7 +296,7 @@ def _generate_incentive_signals(
             evaluation_id=evaluation.id,
             target_id=evaluation.executor_id,
             signal_type=signal_type,
-            magnitude=round(magnitude, 3),
+            magnitude=round(float(magnitude), 3),
             reason=reason,
             applied=False,
             created_at=now,

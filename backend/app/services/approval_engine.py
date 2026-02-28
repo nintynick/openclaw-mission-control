@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
@@ -32,6 +33,82 @@ VALID_PROPOSAL_TYPES = {
     "zone_change",
     "membership_change",
 }
+
+# ---------------------------------------------------------------------------
+# Gap 4 — Risk scoring
+# ---------------------------------------------------------------------------
+
+_PROPOSAL_TYPE_BASE_RISK: dict[str, str] = {
+    "task_execution": "low",
+    "resource_allocation": "medium",
+    "zone_change": "high",
+    "membership_change": "medium",
+}
+
+_RISK_LEVEL_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+
+
+def compute_risk_level(*, zone: TrustZone, proposal: Proposal) -> str:
+    """Compute a risk level for a proposal based on type and budget ratio."""
+    base = _PROPOSAL_TYPE_BASE_RISK.get(proposal.proposal_type, "medium")
+
+    # Budget ratio escalation
+    payload = proposal.payload or {}
+    budget_amount = payload.get("budget_amount")
+    budget_limit = None
+    if zone.resource_scope and isinstance(zone.resource_scope, dict):
+        budget_limit = zone.resource_scope.get("budget_limit")
+
+    if (
+        isinstance(budget_amount, (int, float))
+        and isinstance(budget_limit, (int, float))
+        and budget_limit > 0
+    ):
+        ratio = budget_amount / budget_limit
+        if ratio >= 0.8:
+            return "critical"
+        if ratio >= 0.5:
+            # Escalate one level from base
+            idx = min(_RISK_LEVEL_ORDER.get(base, 1) + 1, 3)
+            for level, order in _RISK_LEVEL_ORDER.items():
+                if order == idx:
+                    return level
+
+    return base
+
+
+# ---------------------------------------------------------------------------
+# Gap 5 — Conflict detection
+# ---------------------------------------------------------------------------
+
+
+def detect_conflicts(
+    *,
+    proposal: Proposal,
+    reviewer_ids: list[object],
+) -> list[dict[str, object]]:
+    """Detect conflicts of interest between reviewers and the proposal."""
+    conflicts: list[dict[str, object]] = []
+    payload = proposal.payload or {}
+    subject_member_id = payload.get("member_id")
+
+    for rid in reviewer_ids:
+        # Self-review: reviewer is the proposer
+        if rid == proposal.proposer_id:
+            conflicts.append({
+                "reviewer_id": str(rid),
+                "conflict_type": "self_review",
+                "reason": "Reviewer is the proposer",
+            })
+        # Subject of proposal: reviewer is the member being modified
+        if subject_member_id is not None and str(rid) == str(subject_member_id):
+            conflicts.append({
+                "reviewer_id": str(rid),
+                "conflict_type": "subject_of_proposal",
+                "reason": "Reviewer is the subject of the proposal",
+            })
+
+    return conflicts
 
 
 async def create_proposal(
@@ -93,23 +170,63 @@ async def create_proposal(
     session.add(proposal)
     await session.flush()
 
+    # Gap 4: Compute risk level
+    proposal.risk_level = compute_risk_level(zone=zone, proposal=proposal)
+
     # Auto-approve check
     if check_auto_approve(zone=zone, proposal=proposal):
         proposal.status = "approved"
         proposal.resolved_at = now
         session.add(proposal)
+
+        # Gap 6: Record audit for auto-approved proposals
+        await record_audit(
+            session,
+            organization_id=organization_id,
+            actor_id=proposer_id,
+            actor_type="system",
+            action="proposal.auto_approve",
+            zone_id=payload.zone_id,
+            target_type="proposal",
+            target_id=proposal.id,
+            commit=False,
+        )
+
         await session.commit()
         await session.refresh(proposal)
         return proposal
 
     # Select reviewers
     reviewers = await select_reviewers(session, zone=zone, proposal=proposal)
+
+    # Gap 5: Detect conflicts
+    reviewer_ids = [rid for rid, _ in reviewers]
+    conflicts = detect_conflicts(proposal=proposal, reviewer_ids=reviewer_ids)
+    if conflicts:
+        proposal.conflicts_detected = conflicts  # type: ignore[assignment]
+
+    conflicted_ids = {c["reviewer_id"] for c in conflicts}
+
+    # Gap 13: Compute deadline from decision_model timeout_hours
+    dm = proposal.decision_model_override
+    if dm is None:
+        dm = zone.decision_model
+    deadline = None
+    if dm and isinstance(dm.get("timeout_hours"), (int, float)):
+        timeout_hours = dm["timeout_hours"]
+        if isinstance(timeout_hours, (int, float)) and timeout_hours > 0:
+            deadline = now + timedelta(hours=float(timeout_hours))
+
     for reviewer_id, reason in reviewers:
+        # Gap 5: Exclude conflicted reviewers from ApprovalRequest creation
+        if str(reviewer_id) in conflicted_ids:
+            continue
         request = ApprovalRequest(
             proposal_id=proposal.id,
             reviewer_id=reviewer_id,
             reviewer_type="human",
             selection_reason=reason,
+            deadline=deadline,
             created_at=now,
         )
         session.add(request)
@@ -213,6 +330,14 @@ def check_auto_approve(*, zone: TrustZone, proposal: Proposal) -> bool:
     auto_approve = zone.approval_policy.get("auto_approve_types")
     if isinstance(auto_approve, list) and proposal.proposal_type in auto_approve:
         return True
+
+    # Gap 6: auto_approve_below numeric threshold
+    threshold = zone.approval_policy.get("auto_approve_below")
+    if isinstance(threshold, (int, float)):
+        budget = (proposal.payload or {}).get("budget_amount")
+        if isinstance(budget, (int, float)) and budget < threshold:
+            return True
+
     return False
 
 
@@ -336,6 +461,26 @@ async def _evaluate_and_resolve(
             else:
                 proposal.status = "rejected"
             proposal.resolved_at = now
+        else:
+            # Gap 13: Consensus timeout — not all have voted, check timeout
+            timeout_hours = dm.get("timeout_hours")
+            if isinstance(timeout_hours, (int, float)) and timeout_hours > 0:
+                elapsed = (now - proposal.created_at).total_seconds() / 3600
+                if elapsed >= timeout_hours:
+                    fallback = dm.get("fallback_model", "threshold")
+                    if fallback == "majority":
+                        if approvals > len(decided) / 2:
+                            proposal.status = "approved"
+                        else:
+                            proposal.status = "rejected"
+                    else:
+                        # Default fallback: threshold
+                        fallback_threshold = int(dm.get("threshold", 1))
+                        if approvals >= fallback_threshold:
+                            proposal.status = "approved"
+                        else:
+                            proposal.status = "rejected"
+                    proposal.resolved_at = now
 
     if proposal.resolved_at is not None:
         proposal.updated_at = now
