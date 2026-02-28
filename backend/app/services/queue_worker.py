@@ -9,6 +9,11 @@ from dataclasses import dataclass
 
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.services.governance_notifications.dispatch import (
+    process_notification_task,
+    requeue_notification_task,
+)
+from app.services.governance_notifications.queue import TASK_TYPE as NOTIFICATION_TASK_TYPE
 from app.services.openclaw.lifecycle_queue import TASK_TYPE as LIFECYCLE_RECONCILE_TASK_TYPE
 from app.services.openclaw.lifecycle_queue import (
     requeue_lifecycle_queue_task,
@@ -48,6 +53,14 @@ _TASK_HANDLERS: dict[str, _TaskHandler] = {
             settings.rq_dispatch_retry_max_seconds,
         ),
         requeue=lambda task, delay: requeue_webhook_queue_task(task, delay_seconds=delay),
+    ),
+    NOTIFICATION_TASK_TYPE: _TaskHandler(
+        handler=process_notification_task,
+        attempts_to_delay=lambda attempts: min(
+            settings.rq_dispatch_retry_base_seconds * (2 ** max(0, attempts)),
+            settings.rq_dispatch_retry_max_seconds,
+        ),
+        requeue=lambda task, delay: requeue_notification_task(task, delay_seconds=delay),
     ),
 }
 

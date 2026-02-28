@@ -32,5 +32,6 @@ class OrganizationMember(QueryModel, table=True):
     role: str = Field(default="member", index=True)
     all_boards_read: bool = Field(default=False)
     all_boards_write: bool = Field(default=False)
+    reputation_score: float = Field(default=0.0)
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)

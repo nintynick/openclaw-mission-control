@@ -1,6 +1,13 @@
 import { cn } from "@/lib/utils";
 
-type StatusDotVariant = "agent" | "approval" | "task";
+type StatusDotVariant =
+  | "agent"
+  | "approval"
+  | "task"
+  | "zone"
+  | "proposal"
+  | "escalation"
+  | "evaluation";
 
 const AGENT_STATUS_DOT_CLASS_BY_STATUS: Record<string, string> = {
   online: "bg-emerald-500",
@@ -24,6 +31,34 @@ const TASK_STATUS_DOT_CLASS_BY_STATUS: Record<string, string> = {
   done: "bg-emerald-500",
 };
 
+const ZONE_STATUS_DOT_CLASS_BY_STATUS: Record<string, string> = {
+  draft: "bg-slate-400",
+  active: "bg-emerald-500",
+  suspended: "bg-amber-500",
+  archived: "bg-rose-400",
+};
+
+const PROPOSAL_STATUS_DOT_CLASS_BY_STATUS: Record<string, string> = {
+  pending_review: "bg-amber-500",
+  approved: "bg-emerald-500",
+  rejected: "bg-rose-500",
+  escalated: "bg-purple-500",
+  expired: "bg-slate-400",
+};
+
+const ESCALATION_STATUS_DOT_CLASS_BY_STATUS: Record<string, string> = {
+  pending: "bg-amber-500",
+  accepted: "bg-emerald-500",
+  dismissed: "bg-slate-400",
+  resolved: "bg-sky-500",
+};
+
+const EVALUATION_STATUS_DOT_CLASS_BY_STATUS: Record<string, string> = {
+  pending: "bg-amber-500",
+  in_progress: "bg-purple-500",
+  completed: "bg-emerald-500",
+};
+
 const STATUS_DOT_CLASS_BY_VARIANT: Record<
   StatusDotVariant,
   Record<string, string>
@@ -31,12 +66,20 @@ const STATUS_DOT_CLASS_BY_VARIANT: Record<
   agent: AGENT_STATUS_DOT_CLASS_BY_STATUS,
   approval: APPROVAL_STATUS_DOT_CLASS_BY_STATUS,
   task: TASK_STATUS_DOT_CLASS_BY_STATUS,
+  zone: ZONE_STATUS_DOT_CLASS_BY_STATUS,
+  proposal: PROPOSAL_STATUS_DOT_CLASS_BY_STATUS,
+  escalation: ESCALATION_STATUS_DOT_CLASS_BY_STATUS,
+  evaluation: EVALUATION_STATUS_DOT_CLASS_BY_STATUS,
 };
 
 const DEFAULT_STATUS_DOT_CLASS: Record<StatusDotVariant, string> = {
   agent: "bg-slate-300",
   approval: "bg-amber-500",
   task: "bg-slate-300",
+  zone: "bg-slate-300",
+  proposal: "bg-amber-500",
+  escalation: "bg-amber-500",
+  evaluation: "bg-slate-300",
 };
 
 export const statusDotClass = (

@@ -4,6 +4,11 @@ from app.models.activity_events import ActivityEvent
 from app.models.agents import Agent
 from app.models.approval_task_links import ApprovalTaskLink
 from app.models.approvals import Approval
+from app.models.approval_requests import ApprovalRequest
+from app.models.audit_entries import AuditEntry
+from app.models.escalations import Escalation, EscalationCosigner
+from app.models.evaluations import Evaluation, EvaluationScore, IncentiveSignal
+from app.models.gardener_feedback import GardenerFeedback
 from app.models.board_group_memory import BoardGroupMemory
 from app.models.board_groups import BoardGroup
 from app.models.board_memory import BoardMemory
@@ -28,13 +33,24 @@ from app.models.task_custom_fields import (
 from app.models.task_dependencies import TaskDependency
 from app.models.task_fingerprints import TaskFingerprint
 from app.models.tasks import Task
+from app.models.proposals import Proposal
+from app.models.trust_zones import TrustZone
 from app.models.users import User
+from app.models.zone_assignments import ZoneAssignment
 
 __all__ = [
     "ActivityEvent",
     "Agent",
     "ApprovalTaskLink",
     "Approval",
+    "ApprovalRequest",
+    "AuditEntry",
+    "Escalation",
+    "EscalationCosigner",
+    "Evaluation",
+    "EvaluationScore",
+    "IncentiveSignal",
+    "GardenerFeedback",
     "BoardGroupMemory",
     "BoardWebhook",
     "BoardWebhookPayload",
@@ -59,5 +75,8 @@ __all__ = [
     "TaskFingerprint",
     "Tag",
     "TagAssignment",
+    "Proposal",
+    "TrustZone",
     "User",
+    "ZoneAssignment",
 ]

@@ -4,15 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Bot,
   Boxes,
   CheckCircle2,
+  ClipboardCheck,
+  FileCheck,
   Folder,
   Building2,
   LayoutGrid,
   Network,
   Settings,
+  Shield,
   Store,
   Tags,
 } from "lucide-react";
@@ -201,6 +205,62 @@ export function DashboardSidebar() {
                 </div>
               </>
             ) : null}
+          </div>
+
+          <div>
+            <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Governance
+            </p>
+            <div className="mt-1 space-y-1">
+              <Link
+                href="/zones"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                  pathname.startsWith("/zones")
+                    ? "bg-blue-100 text-blue-800 font-medium"
+                    : "hover:bg-slate-100",
+                )}
+              >
+                <Shield className="h-4 w-4" />
+                Trust Zones
+              </Link>
+              <Link
+                href="/proposals"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                  pathname.startsWith("/proposals")
+                    ? "bg-blue-100 text-blue-800 font-medium"
+                    : "hover:bg-slate-100",
+                )}
+              >
+                <FileCheck className="h-4 w-4" />
+                Proposals
+              </Link>
+              <Link
+                href="/escalations"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                  pathname.startsWith("/escalations")
+                    ? "bg-blue-100 text-blue-800 font-medium"
+                    : "hover:bg-slate-100",
+                )}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Escalations
+              </Link>
+              <Link
+                href="/evaluations"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                  pathname.startsWith("/evaluations")
+                    ? "bg-blue-100 text-blue-800 font-medium"
+                    : "hover:bg-slate-100",
+                )}
+              >
+                <ClipboardCheck className="h-4 w-4" />
+                Evaluations
+              </Link>
+            </div>
           </div>
 
           <div>

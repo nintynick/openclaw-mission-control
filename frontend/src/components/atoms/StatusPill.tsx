@@ -16,6 +16,24 @@ const STATUS_STYLES: Record<
   offline: "outline",
   deleting: "danger",
   updating: "accent",
+  // Zone statuses
+  draft: "outline",
+  active: "success",
+  suspended: "warning",
+  archived: "danger",
+  // Proposal statuses
+  pending_review: "warning",
+  approved: "success",
+  rejected: "danger",
+  escalated: "accent",
+  expired: "outline",
+  // Escalation statuses
+  pending: "warning",
+  accepted: "success",
+  dismissed: "outline",
+  resolved: "accent",
+  // Evaluation statuses
+  completed: "success",
 };
 
 export function StatusPill({ status }: { status: string }) {
