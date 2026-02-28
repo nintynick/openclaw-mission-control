@@ -11,7 +11,7 @@ import pytest
 from app.models.escalations import Escalation, EscalationCosigner
 from app.models.proposals import Proposal
 from app.models.trust_zones import TrustZone
-from app.services.escalation_engine import _get_cosigner_threshold
+from app.services.escalation_engine import _get_cosigner_threshold, sweep_auto_escalations
 
 
 def test_escalation_model_defaults() -> None:
@@ -86,6 +86,28 @@ def test_get_cosigner_threshold_no_policy() -> None:
         escalation_policy=None,
     )
     assert _get_cosigner_threshold(zone) == 2
+
+
+def test_sweep_auto_escalations_is_callable() -> None:
+    """Gap 9: sweep_auto_escalations is importable and callable."""
+    assert callable(sweep_auto_escalations)
+
+
+def test_escalation_deadlock_policy_field() -> None:
+    """Gap 9: auto_escalate_on_deadlock can be set in escalation_policy."""
+    zone = TrustZone(
+        organization_id=uuid4(),
+        name="test",
+        slug="test",
+        created_by=uuid4(),
+        escalation_policy={
+            "auto_escalate_on_deadlock": True,
+            "auto_escalate_after_hours": 24,
+        },
+    )
+    policy = zone.escalation_policy
+    assert policy["auto_escalate_on_deadlock"] is True
+    assert policy["auto_escalate_after_hours"] == 24
 
 
 def test_get_cosigner_threshold_invalid_type() -> None:

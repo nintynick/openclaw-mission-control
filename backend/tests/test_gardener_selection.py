@@ -132,3 +132,29 @@ def test_gardener_service_init_default_model() -> None:
 def test_gardener_service_init_custom_model() -> None:
     service = GardenerService(model="claude-opus-4-20250514")
     assert service._model == "claude-opus-4-20250514"
+
+
+def test_reviewer_selection_enriched_fields() -> None:
+    """Gap 12: ReviewerSelection supports optional enriched fields."""
+    rid = uuid4()
+    selection = ReviewerSelection(
+        reviewer_id=rid,
+        reason="test",
+        risk_level="high",
+        decision_model_override={"model_type": "threshold", "threshold": 2},
+        conflicts_detected=[{"conflict_type": "self_review"}],
+    )
+    assert selection.risk_level == "high"
+    assert selection.decision_model_override["model_type"] == "threshold"
+    assert len(selection.conflicts_detected) == 1
+
+
+def test_reviewer_selection_enriched_fields_default_none() -> None:
+    """Gap 12: Enriched fields default to None."""
+    selection = ReviewerSelection(
+        reviewer_id=uuid4(),
+        reason="test",
+    )
+    assert selection.risk_level is None
+    assert selection.decision_model_override is None
+    assert selection.conflicts_detected is None

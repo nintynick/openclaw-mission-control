@@ -142,6 +142,69 @@ async def test_consensus_all_approve() -> None:
 
 
 @pytest.mark.asyncio
+async def test_consensus_timeout_resolves_with_threshold_fallback() -> None:
+    """Gap 13: Consensus model with timeout_hours triggers fallback resolution."""
+    from datetime import datetime, timedelta
+
+    zone_id = uuid4()
+    created_at = datetime(2020, 1, 1)  # far in the past
+    proposal = Proposal(
+        id=uuid4(),
+        organization_id=uuid4(),
+        zone_id=zone_id,
+        proposer_id=uuid4(),
+        title="Test",
+        proposal_type="task_execution",
+        decision_model_override={
+            "model_type": "consensus",
+            "threshold": 1,
+            "timeout_hours": 1,
+        },
+        created_at=created_at,
+    )
+    r1 = ApprovalRequest(proposal_id=proposal.id, reviewer_id=uuid4(), decision="approve")
+    r2 = ApprovalRequest(proposal_id=proposal.id, reviewer_id=uuid4(), decision=None)  # undecided
+
+    session = _FakeSession(exec_results=[
+        _FakeExecResult(all_values=[r1, r2]),
+    ])
+    await _evaluate_and_resolve(session, proposal=proposal)
+    # Not all voted, but timeout has expired (created_at is far in the past)
+    # With 1 approve >= threshold of 1, should resolve as approved
+    assert proposal.status == "approved"
+    assert proposal.resolved_at is not None
+
+
+@pytest.mark.asyncio
+async def test_consensus_no_timeout_remains_pending() -> None:
+    """Without timeout expiring, consensus model doesn't resolve on partial votes."""
+    zone_id = uuid4()
+    proposal = Proposal(
+        id=uuid4(),
+        organization_id=uuid4(),
+        zone_id=zone_id,
+        proposer_id=uuid4(),
+        title="Test",
+        proposal_type="task_execution",
+        decision_model_override={
+            "model_type": "consensus",
+            "threshold": 1,
+            "timeout_hours": 999999,  # Very far in the future
+        },
+    )
+    r1 = ApprovalRequest(proposal_id=proposal.id, reviewer_id=uuid4(), decision="approve")
+    r2 = ApprovalRequest(proposal_id=proposal.id, reviewer_id=uuid4(), decision=None)
+
+    session = _FakeSession(exec_results=[
+        _FakeExecResult(all_values=[r1, r2]),
+    ])
+    await _evaluate_and_resolve(session, proposal=proposal)
+    # Timeout not expired yet, still pending
+    assert proposal.status == "pending_review"
+    assert proposal.resolved_at is None
+
+
+@pytest.mark.asyncio
 async def test_consensus_broken_falls_back_to_threshold() -> None:
     zone_id = uuid4()
     proposal = Proposal(
