@@ -13,6 +13,7 @@ from app.core.time import utcnow
 from app.models.evaluations import Evaluation, EvaluationScore, IncentiveSignal
 from app.models.organization_members import OrganizationMember
 from app.models.trust_zones import TrustZone
+from app.models.users import User
 from app.services.audit import record_audit
 from app.services.governance_notifications.queue import GovernanceNotification, enqueue_notification
 
@@ -39,6 +40,13 @@ async def create_evaluation(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Zone not found in organization",
+        )
+
+    user = await User.objects.by_id(payload.executor_id).first(session)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="executor_id must reference a valid user ID",
         )
 
     now = utcnow()
@@ -357,7 +365,10 @@ async def apply_incentive_signals(
 
     applied_count = 0
     for signal in signals:
-        member = await OrganizationMember.objects.by_id(signal.target_id).first(session)
+        member = await OrganizationMember.objects.filter_by(
+            user_id=signal.target_id,
+            organization_id=evaluation.organization_id,
+        ).first(session)
         if member is None:
             continue
 

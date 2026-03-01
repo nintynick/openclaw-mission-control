@@ -133,6 +133,23 @@ def validate_resource_scope_narrowing(
                 ),
             )
 
+    # Generic: for any other matching numeric key, child cannot exceed parent
+    known_keys = {"budget_limit", "allowed_boards", "allowed_agent_types"}
+    for key in child_scope:
+        if key in known_keys:
+            continue
+        parent_val = parent_scope.get(key)
+        child_val = child_scope[key]
+        if (
+            isinstance(parent_val, (int, float))
+            and isinstance(child_val, (int, float))
+            and child_val > parent_val
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Child {key} ({child_val}) exceeds parent {key} ({parent_val})",
+            )
+
 
 # ---------------------------------------------------------------------------
 # Zone CRUD
@@ -259,10 +276,25 @@ async def update_zone(
                 child_scope=child_scope,
             )
 
+    # When this zone's resource_scope is updated, validate existing children
+    if "resource_scope" in updates and updates["resource_scope"] is not None:
+        children = await get_zone_children(session, zone_id=zone.id)
+        for child in children:
+            if child.resource_scope is not None:
+                validate_resource_scope_narrowing(
+                    parent_scope=updates["resource_scope"],
+                    child_scope=child.resource_scope,
+                )
+
     for key, value in updates.items():
         setattr(zone, key, value)
     zone.updated_at = utcnow()
     session.add(zone)
+
+    # Cascade status to children when archiving or suspending
+    if "status" in updates and updates["status"] in ("archived", "suspended"):
+        await cascade_status(session, zone=zone, target_status=updates["status"])
+
     await session.commit()
     await session.refresh(zone)
     return zone

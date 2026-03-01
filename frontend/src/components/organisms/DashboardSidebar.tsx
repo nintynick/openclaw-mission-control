@@ -15,6 +15,7 @@ import {
   Building2,
   LayoutGrid,
   Network,
+  ScrollText,
   Settings,
   Shield,
   Store,
@@ -259,6 +260,18 @@ export function DashboardSidebar() {
               >
                 <ClipboardCheck className="h-4 w-4" />
                 Evaluations
+              </Link>
+              <Link
+                href="/audit"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-700 transition",
+                  pathname.startsWith("/audit")
+                    ? "bg-blue-100 text-blue-800 font-medium"
+                    : "hover:bg-slate-100",
+                )}
+              >
+                <ScrollText className="h-4 w-4" />
+                Audit Trail
               </Link>
             </div>
           </div>

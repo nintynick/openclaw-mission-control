@@ -376,7 +376,7 @@ async def test_evaluation_finalize_updates_reputation() -> None:
             # Create evaluation
             eval_payload = EvaluationCreate(
                 zone_id=zone.id,
-                executor_id=executor_member.id,
+                executor_id=executor_user.id,
             )
             evaluation = await create_evaluation(
                 session,
@@ -789,7 +789,7 @@ async def test_reviewer_incentive_signals_generated() -> None:
             eval_payload = EvaluationCreate(
                 zone_id=zone.id,
                 proposal_id=proposal.id,
-                executor_id=executor_member.id,
+                executor_id=executor_user.id,
             )
             evaluation = await create_evaluation(
                 session,
@@ -852,7 +852,7 @@ async def test_auto_evaluate_automated_check() -> None:
 
             eval_payload = EvaluationCreate(
                 zone_id=zone.id,
-                executor_id=executor_member.id,
+                executor_id=executor_user.id,
             )
             evaluation = await create_evaluation(
                 session,
@@ -902,7 +902,7 @@ async def test_auto_evaluate_no_criteria() -> None:
 
             eval_payload = EvaluationCreate(
                 zone_id=zone.id,
-                executor_id=executor_member.id,
+                executor_id=executor_user.id,
             )
             evaluation = await create_evaluation(
                 session,
