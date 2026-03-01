@@ -17,6 +17,7 @@ export interface OrganizationMemberRead {
   role: string;
   all_boards_read: boolean;
   all_boards_write: boolean;
+  reputation_score?: number;
   created_at: string;
   updated_at: string;
   user?: OrganizationUserRead | null;
